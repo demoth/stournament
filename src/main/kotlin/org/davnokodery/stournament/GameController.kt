@@ -5,7 +5,7 @@ import org.springframework.web.bind.annotation.*
 @CrossOrigin
 @RestController
 class GameController {
-    val gameState = GameState()
+    var gameState = GameState()
 
     @GetMapping("/state")
     fun getState(): GameState {
@@ -17,7 +17,9 @@ class GameController {
         @RequestParam("player") player: Int,
         @RequestParam("card") cardId: String
     ): GameState {
-        gameState.performAction(player, cardId)
+        val restart = gameState.performAction(player, cardId)
+        if (restart)
+            gameState = GameState()
         return gameState
     }
 }

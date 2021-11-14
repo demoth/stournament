@@ -11,12 +11,12 @@ data class GameState(
     val player2: Player = Player("Dire"),
     var message: String = ""
 ) {
-    fun performAction(player: Int, cardId: String) {
+    fun performAction(player: Int, cardId: String): Boolean {
         val currentPlayer = if (player == 1) player1 else player2
         val currentEnemy = if (player != 1) player1 else player2
 
         message = if (status == PLAYER_1_WON || status == PLAYER_2_WON) {
-            "Game is over"
+            return true
         } else if (player == 1 && status != PLAYER_1_TURN || player != 1 && status != PLAYER_2_TURN) {
             "Not your turn"
         } else if (currentPlayer.cards.find { it.id == cardId } == null) {
@@ -27,16 +27,29 @@ data class GameState(
             if (result.isBlank()) {
                 println(currentPlayer.name + " played " + card.name)
                 currentPlayer.cards.removeIf { it.id == cardId }
-                endTurn()
+                status = updateStatus()
                 logState()
-                ""
+
+                when (status) {
+                    PLAYER_1_WON -> {
+                        getWinnerMessage(player1.name)
+                    }
+                    PLAYER_2_WON -> {
+                        getWinnerMessage(player2.name)
+                    }
+                    else -> ""
+                }
+
             } else {
                 val cardError = currentPlayer.name + " cannot play " + card.name + " right now: $result"
                 println(cardError)
                 cardError
             }
         }
+        return false
     }
+
+    private fun getWinnerMessage(winner: String): String = "$winner has won! Click again to restart"
 
     private fun logState() {
         println("Player 1 : ${player1.health}/20")
@@ -44,8 +57,7 @@ data class GameState(
         println("State: $status")
     }
 
-    private fun endTurn() {
-        status =
+    private fun updateStatus(): GameStatus =
             if (player1.health <= 0)
                 PLAYER_2_WON
             else if (player2.health <= 0)
@@ -54,7 +66,7 @@ data class GameState(
                 PLAYER_2_TURN
             else
                 PLAYER_1_TURN
-    }
+
 }
 
 enum class GameStatus {
@@ -75,6 +87,7 @@ data class Player(
 data class Card(
     val name: String,
     val iconName: String,
+    val description: String,
     // returns if the card was played
     @JsonIgnore val action: (self: Player, target: Player) -> String,
     val id: String = UUID.randomUUID().toString()
@@ -82,6 +95,7 @@ data class Card(
 
 fun fireball() = Card("Fireball",
     "SpellBook01_84.PNG",
+    "Deals 10 damage to the opponent",
     { self, target ->
         target.health -= 10
         ""
@@ -91,6 +105,7 @@ fun fireball() = Card("Fireball",
 fun healing() = Card(
     "Healing",
     "SpellBook08_118.PNG",
+    "Heals 10 points",
     { self, target ->
         if (self.health >= self.maxHealth)
             "Already at full health"
