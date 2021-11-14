@@ -2,6 +2,7 @@ package org.davnokodery.stournament
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import org.davnokodery.stournament.GameStatus.*
+import java.lang.Math.min
 import java.util.*
 
 data class GameState(
@@ -21,13 +22,15 @@ data class GameState(
 
         val card = currentPlayer.cards.find { it.id == cardId } ?: throw GameException("No such card")
 
-        card.action.invoke(currentPlayer, currentEnemy)
-        println(currentPlayer.name + " played " + card.name)
-        currentPlayer.cards.removeIf { it.id == cardId }
-
-        endTurn()
-
-        logState()
+        val successful = card.action.invoke(currentPlayer, currentEnemy)
+        if (successful) {
+            println(currentPlayer.name + " played " + card.name)
+            currentPlayer.cards.removeIf { it.id == cardId }
+            endTurn()
+            logState()
+        } else {
+            println(currentPlayer.name + " cannot play " + card.name + " right now")
+        }
     }
 
     private fun logState() {
@@ -57,8 +60,9 @@ enum class GameStatus {
 }
 
 data class Player(
-    val name:  String,
+    val name: String,
     var health: Int = 20,
+    var maxHealth: Int = 30,
     val cards: MutableList<Card> = (0..7).map { if (Random().nextInt() % 2 == 0) fireball() else healing() }
         .toMutableList()
 )
@@ -66,7 +70,8 @@ data class Player(
 data class Card(
     val name: String,
     val iconName: String,
-    @JsonIgnore val action: (self: Player, target: Player) -> Unit,
+    // returns if the card was played
+    @JsonIgnore val action: (self: Player, target: Player) -> Boolean,
     val id: String = UUID.randomUUID().toString()
 )
 
@@ -74,6 +79,7 @@ fun fireball() = Card("Fireball",
     "SpellBook01_84.PNG",
     { self, target ->
         target.health -= 10
+        true
     }
 )
 
@@ -81,7 +87,12 @@ fun healing() = Card(
     "Healing",
     "SpellBook08_118.PNG",
     { self, target ->
-        self.health += 10
+        if (self.health >= self.maxHealth)
+            false
+        else {
+            self.health = min(self.maxHealth, self.health + 10)
+            true
+        }
     }
 )
 
