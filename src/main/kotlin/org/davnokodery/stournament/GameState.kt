@@ -1,21 +1,43 @@
 package org.davnokodery.stournament
 
+import org.davnokodery.stournament.GameStatus.*
 import java.util.*
 
-data class GameState (
-    val player1:Player = Player(),
-    val player2:Player = Player(),
-    var status: GameStatus = GameStatus.PLAYER_1_TURN
+data class GameState(
+    var status: GameStatus = PLAYER_1_TURN,
+    val player1: Player = Player(),
+    val player2: Player = Player()
 ) {
     fun performAction(player: Int, cardId: String) {
         val currentPlayer = if (player == 1) player1 else player2
         val currentEnemy = if (player != 1) player1 else player2
+
+        if (player == 1 && status != PLAYER_1_TURN || player != 1 && status != PLAYER_2_TURN)
+            throw IllegalStateException("Not your turn")
+
+        if (status == PLAYER_1_WON || status == PLAYER_2_WON)
+            throw IllegalStateException("Game is over")
+
         val card = currentPlayer.cards.find { it.id == cardId } ?: throw IllegalArgumentException("No such card")
         when (card.action) {
             CardAction.FIREBALL -> currentEnemy.health -= 5
-            CardAction.APPLE -> currentPlayer.health += 5
+            CardAction.HEALING -> currentPlayer.health += 5
         }
         currentPlayer.cards.removeIf { it.id == cardId }
+
+        updateStatus()
+    }
+
+    private fun updateStatus() {
+        status =
+            if (player1.health <= 0)
+                PLAYER_2_WON
+            else if (player2.health <= 0)
+                PLAYER_1_WON
+            else if (status == PLAYER_1_TURN)
+                PLAYER_2_TURN
+            else
+                PLAYER_1_TURN
     }
 }
 
@@ -28,7 +50,15 @@ enum class GameStatus {
 
 data class Player(
     var health: Int = 20,
-    val cards: MutableList<Card> = mutableListOf(fireball(), healing())
+    val cards: MutableList<Card> = mutableListOf(
+        fireball(),
+        fireball(),
+        fireball(),
+        fireball(),
+        fireball(),
+        fireball(),
+        healing()
+    )
 )
 
 fun fireball() = Card(
@@ -40,7 +70,7 @@ fun fireball() = Card(
 fun healing() = Card(
     "Healing",
     "SpellBook08_118.PNG",
-    CardAction.APPLE
+    CardAction.HEALING
 )
 
 data class Card(
@@ -52,7 +82,7 @@ data class Card(
 
 enum class CardAction {
     FIREBALL,
-    APPLE
+    HEALING
 }
 
-data class ClientAction (val cardId: String)
+data class ClientAction(val cardId: String)
