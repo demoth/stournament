@@ -7,29 +7,34 @@ import java.util.*
 
 data class GameState(
     var status: GameStatus = PLAYER_1_TURN,
-    val player1: Player = Player("Player 1"),
-    val player2: Player = Player("Player 2")
+    val player1: Player = Player("Radiant"),
+    val player2: Player = Player("Dire"),
+    var message: String = ""
 ) {
     fun performAction(player: Int, cardId: String) {
         val currentPlayer = if (player == 1) player1 else player2
         val currentEnemy = if (player != 1) player1 else player2
 
-        if (status == PLAYER_1_WON || status == PLAYER_2_WON)
-            throw GameException("Game is over")
-
-        if (player == 1 && status != PLAYER_1_TURN || player != 1 && status != PLAYER_2_TURN)
-            throw GameException("Not your turn")
-
-        val card = currentPlayer.cards.find { it.id == cardId } ?: throw GameException("No such card")
-
-        val successful = card.action.invoke(currentPlayer, currentEnemy)
-        if (successful) {
-            println(currentPlayer.name + " played " + card.name)
-            currentPlayer.cards.removeIf { it.id == cardId }
-            endTurn()
-            logState()
+        message = if (status == PLAYER_1_WON || status == PLAYER_2_WON) {
+            "Game is over"
+        } else if (player == 1 && status != PLAYER_1_TURN || player != 1 && status != PLAYER_2_TURN) {
+            "Not your turn"
+        } else if (currentPlayer.cards.find { it.id == cardId } == null) {
+            "No such card"
         } else {
-            println(currentPlayer.name + " cannot play " + card.name + " right now")
+            val card = currentPlayer.cards.find { it.id == cardId }!!
+            val result = card.action.invoke(currentPlayer, currentEnemy)
+            if (result.isBlank()) {
+                println(currentPlayer.name + " played " + card.name)
+                currentPlayer.cards.removeIf { it.id == cardId }
+                endTurn()
+                logState()
+                ""
+            } else {
+                val cardError = currentPlayer.name + " cannot play " + card.name + " right now: $result"
+                println(cardError)
+                cardError
+            }
         }
     }
 
@@ -71,7 +76,7 @@ data class Card(
     val name: String,
     val iconName: String,
     // returns if the card was played
-    @JsonIgnore val action: (self: Player, target: Player) -> Boolean,
+    @JsonIgnore val action: (self: Player, target: Player) -> String,
     val id: String = UUID.randomUUID().toString()
 )
 
@@ -79,7 +84,7 @@ fun fireball() = Card("Fireball",
     "SpellBook01_84.PNG",
     { self, target ->
         target.health -= 10
-        true
+        ""
     }
 )
 
@@ -88,10 +93,10 @@ fun healing() = Card(
     "SpellBook08_118.PNG",
     { self, target ->
         if (self.health >= self.maxHealth)
-            false
+            "Already at full health"
         else {
             self.health = min(self.maxHealth, self.health + 10)
-            true
+            ""
         }
     }
 )
