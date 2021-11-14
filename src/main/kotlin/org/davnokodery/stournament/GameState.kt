@@ -50,15 +50,7 @@ enum class GameStatus {
 
 data class Player(
     var health: Int = 20,
-    val cards: MutableList<Card> = mutableListOf(
-        fireball(),
-        fireball(),
-        fireball(),
-        fireball(),
-        fireball(),
-        fireball(),
-        healing()
-    )
+    val cards: MutableList<Card> = (0..7).map { if (Random().nextInt() % 2 == 0) fireball() else healing() }.toMutableList()
 )
 
 fun fireball() = Card(
