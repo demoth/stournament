@@ -35,3 +35,6 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### TODO create a storage with proper licensing
+src/main/resources/static
