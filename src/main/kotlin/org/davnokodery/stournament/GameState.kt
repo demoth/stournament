@@ -58,14 +58,14 @@ data class GameState(
     }
 
     private fun updateStatus(): GameStatus =
-            if (player1.health <= 0)
-                PLAYER_2_WON
-            else if (player2.health <= 0)
-                PLAYER_1_WON
-            else if (status == PLAYER_1_TURN)
-                PLAYER_2_TURN
-            else
-                PLAYER_1_TURN
+        if (player1.health <= 0)
+            PLAYER_2_WON
+        else if (player2.health <= 0)
+            PLAYER_1_WON
+        else if (status == PLAYER_1_TURN)
+            PLAYER_2_TURN
+        else
+            PLAYER_1_TURN
 
 }
 
@@ -80,7 +80,8 @@ data class Player(
     val name: String,
     var health: Int = 20,
     var maxHealth: Int = 30,
-    val cards: MutableList<Card> = (0..7).map { if (Random().nextInt() % 2 == 0) fireball() else healing() }
+    val cards: MutableList<Card> = (0..7)
+        .map { if (Random().nextInt() % 2 == 0) fireball() else healing() }
         .toMutableList()
 )
 
@@ -104,8 +105,8 @@ fun fireball() = Card("Fireball",
 
 fun healing() = Card(
     "Healing",
-    "SpellBook08_118.PNG",
-    "Heals 10 points",
+    "SpellBookPage09_add_003.png",
+    "Heals you for 10 points",
     { self, target ->
         if (self.health >= self.maxHealth)
             "Already at full health"
