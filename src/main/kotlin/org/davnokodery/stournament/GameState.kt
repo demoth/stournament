@@ -6,7 +6,18 @@ data class GameState (
     val player1:Player = Player(),
     val player2:Player = Player(),
     var status: GameStatus = GameStatus.PLAYER_1_TURN
-)
+) {
+    fun performAction(player: Int, cardId: String) {
+        val currentPlayer = if (player == 1) player1 else player2
+        val currentEnemy = if (player != 1) player1 else player2
+        val card = currentPlayer.cards.find { it.id == cardId } ?: throw IllegalArgumentException("No such card")
+        when (card.action) {
+            CardAction.FIREBALL -> currentEnemy.health -= 5
+            CardAction.APPLE -> currentPlayer.health += 5
+        }
+        currentPlayer.cards.removeIf { it.id == cardId }
+    }
+}
 
 enum class GameStatus {
     PLAYER_1_TURN,
@@ -17,11 +28,11 @@ enum class GameStatus {
 
 data class Player(
     var health: Int = 20,
-    val action: List<Card> = mutableListOf(fireball(), healing())
+    val cards: MutableList<Card> = mutableListOf(fireball(), healing())
 )
 
 fun fireball() = Card(
-    "Lava Axe",
+    "Fireball",
     "SpellBook01_84.PNG",
     CardAction.FIREBALL
 )

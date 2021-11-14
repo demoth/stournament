@@ -18,7 +18,8 @@ class GameController {
     fun postAction(
         @RequestParam("player") player: Int,
         @RequestParam("card") cardId: String
-    ) {
-        TODO("WHATAFAAAAAAAAA BOOOOOOM")
+    ): GameState {
+        gameState.performAction(player, cardId)
+        return gameState
     }
 }
