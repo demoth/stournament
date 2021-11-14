@@ -49,18 +49,18 @@ data class GameState(
         return false
     }
 
-    private fun getWinnerMessage(winner: String): String = "$winner has won! Click again to restart"
+    private fun getWinnerMessage(winner: String): String = "$winner has won! Click any card to restart"
 
     private fun logState() {
-        println("Player 1 : ${player1.health}/20")
-        println("Player 2 : ${player2.health}/20")
+        println("Player 1 : ${player1.health}/${player1.maxHealth}")
+        println("Player 2 : ${player2.health}/${player2.maxHealth}")
         println("State: $status")
     }
 
     private fun updateStatus(): GameStatus =
-        if (player1.health <= 0)
+        if (player1.health <= 0 || player1.cards.isEmpty())
             PLAYER_2_WON
-        else if (player2.health <= 0)
+        else if (player2.health <= 0 || player2.cards.isEmpty())
             PLAYER_1_WON
         else if (status == PLAYER_1_TURN)
             PLAYER_2_TURN
@@ -108,12 +108,12 @@ fun healing() = Card(
     "SpellBookPage09_add_003.png",
     "Heals you for 10 points",
     { self, target ->
-        if (self.health >= self.maxHealth)
-            "Already at full health"
-        else {
+//        if (self.health >= self.maxHealth)
+//            "Already at full health"
+//        else {
             self.health = min(self.maxHealth, self.health + 10)
             ""
-        }
+//        }
     }
 )
 
