@@ -1,9 +1,6 @@
 package org.davnokodery.stournament
 
-import com.fasterxml.jackson.annotation.JsonIgnore
 import org.davnokodery.stournament.GameStatus.*
-import java.lang.Math.min
-import java.util.*
 
 data class GameState(
     var status: GameStatus = PLAYER_1_TURN,
@@ -11,45 +8,64 @@ data class GameState(
     val player2: Player = Player("Dire"),
     var message: String = ""
 ) {
-    fun performAction(player: Int, cardId: String): Boolean {
+    fun performAction(player: Int, cardId: String?) {
+
         val currentPlayer = if (player == 1) player1 else player2
+
         val currentEnemy = if (player != 1) player1 else player2
 
-        message = if (status == PLAYER_1_WON || status == PLAYER_2_WON) {
-            return true
-        } else if (player == 1 && status != PLAYER_1_TURN || player != 1 && status != PLAYER_2_TURN) {
-            "Not your turn"
-        } else if (currentPlayer.cards.find { it.id == cardId } == null) {
-            "No such card"
-        } else {
-            val card = currentPlayer.cards.find { it.id == cardId }!!
-            val result = card.action.invoke(currentPlayer, currentEnemy)
-            if (result.isBlank()) {
-                println(currentPlayer.name + " played " + card.name)
-                currentPlayer.cards.removeIf { it.id == cardId }
-                status = updateStatus()
-                logState()
+        if (status == PLAYER_1_WON || status == PLAYER_2_WON) {
+            return
+        }
 
-                when (status) {
-                    PLAYER_1_WON -> {
-                        getWinnerMessage(player1.name)
-                    }
-                    PLAYER_2_WON -> {
-                        getWinnerMessage(player2.name)
-                    }
-                    else -> ""
-                }
+        if (player == 1 && status != PLAYER_1_TURN || player != 1 && status != PLAYER_2_TURN) {
+            message = "Not your turn"
+            return
+        }
 
+        if (cardId != null && !currentPlayer.cards.containsKey(cardId)) {
+            message = "No such card"
+            return
+        }
+
+        // try to play selected card
+        if (cardId != null) {
+            val card = currentPlayer.cards[cardId]!!
+            val cardError = card.validate?.invoke(currentPlayer, currentEnemy)
+
+            if (!cardError.isNullOrBlank()) {
+                val cardErrorMessage = currentPlayer.name + " cannot play " + card.name + " right now: $cardError"
+                println(cardErrorMessage)
+                message = cardErrorMessage
             } else {
-                val cardError = currentPlayer.name + " cannot play " + card.name + " right now: $result"
-                println(cardError)
-                cardError
+                println(currentPlayer.name + " played " + card.name)
+                currentPlayer.cards.remove(cardId)
+                currentPlayer.effects.add(card)
+            }
+
+        }
+
+        // update existing state
+        currentPlayer.effects.removeIf {
+            if (it.turns == 0) {
+                // safety net condition, ideally cards should expire on the turn they are used
+                it.expire?.invoke(currentPlayer, currentEnemy)
+                true
+            } else {
+                it.effect.invoke(currentPlayer, currentEnemy)
+                it.turns--
+                if (it.turns == 0) {
+                    it.expire?.invoke(currentPlayer, currentEnemy)
+                    true
+                } else {
+                    false
+                }
             }
         }
-        return false
-    }
 
-    private fun getWinnerMessage(winner: String): String = "$winner has won! Click any card to restart"
+        status = updateStatus()
+        logState()
+    }
 
     private fun logState() {
         println("Player 1 : ${player1.health}/${player1.maxHealth}")
@@ -69,54 +85,5 @@ data class GameState(
 
 }
 
-enum class GameStatus {
-    PLAYER_1_TURN,
-    PLAYER_2_TURN,
-    PLAYER_1_WON,
-    PLAYER_2_WON
-}
 
-data class Player(
-    val name: String,
-    var health: Int = 20,
-    var maxHealth: Int = 30,
-    val cards: MutableList<Card> = (0..7)
-        .map { if (Random().nextInt() % 2 == 0) fireball() else healing() }
-        .toMutableList()
-)
 
-data class Card(
-    val name: String,
-    val iconName: String,
-    val description: String,
-    // returns if the card was played
-    @JsonIgnore val action: (self: Player, target: Player) -> String,
-    val id: String = UUID.randomUUID().toString()
-)
-
-fun fireball() = Card("Fireball",
-    "SpellBook01_84.PNG",
-    "Deals 10 damage to the opponent",
-    { self, target ->
-        target.health -= 10
-        ""
-    }
-)
-
-fun healing() = Card(
-    "Healing",
-    "SpellBookPage09_add_003.png",
-    "Heals you for 10 points",
-    { self, target ->
-//        if (self.health >= self.maxHealth)
-//            "Already at full health"
-//        else {
-            self.health = min(self.maxHealth, self.health + 10)
-            ""
-//        }
-    }
-)
-
-data class ErrorResponse(
-    val message: String
-)

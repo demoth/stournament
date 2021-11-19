@@ -15,11 +15,9 @@ class GameController {
     @PostMapping("/action")
     fun postAction(
         @RequestParam("player") player: Int,
-        @RequestParam("card") cardId: String
+        @RequestParam("card") cardId: String?
     ): GameState {
-        val restart = gameState.performAction(player, cardId)
-        if (restart)
-            gameState = GameState()
+        gameState.performAction(player, cardId)
         return gameState
     }
 }
