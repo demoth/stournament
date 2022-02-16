@@ -6,6 +6,7 @@ data class GameState(
     var status: GameStatus = PLAYER_1_TURN,
     val player1: Player = Player("Radiant"),
     val player2: Player = Player("Dire"),
+    @Deprecated("Error messages")
     var message: String = ""
 ) {
     fun performAction(player: Int, cardId: String?) {

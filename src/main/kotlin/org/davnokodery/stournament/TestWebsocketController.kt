@@ -13,9 +13,11 @@ data class TestResponseMessage(val content: String)
 @CrossOrigin
 class TestWebsocketController {
     @MessageMapping("/test-request")
-    @SendTo("/topic/test-response")
-    fun respond(request: TestRequestMessage): TestResponseMessage {
+//    @SendTo("/topic/test-response")
+    fun respond(request: TestRequestMessage)
+//    : TestResponseMessage
+    {
         println("received: " + request.content)
-        return TestResponseMessage("Hello, ${request.content}")
+//        return TestResponseMessage("Hello, ${request.content}")
     }
 }

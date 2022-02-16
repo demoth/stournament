@@ -40,3 +40,18 @@ private fun createRandomCards() = (0..7)
     .associateBy { it.id }
     .toMutableMap()
 
+/// client entities
+
+data class EnemyPlayer(
+    val name: String,
+    val health: Int,
+    val maxHealth: Int,
+    val effects: List<Card>,
+    val numberOfCardsInHand: Int
+)
+
+data class ClientState(
+    var status: GameStatus,
+    val self: Player,
+    val enemy: EnemyPlayer,
+)
