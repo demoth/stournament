@@ -5,20 +5,27 @@ import org.davnokodery.stournament.GameException
 import java.util.*
 import java.util.concurrent.ConcurrentLinkedQueue
 
+fun interface Validator {
+    fun validate(self: Card, owner: SessionPlayer, enemy: SessionPlayer, targetEffect: Card?): String?
+}
+
 data class Card(
     // template section
     val name: String,
     val iconName: String,
     val description: String,
-    val tags: Set<String>, // todo: enum?
+    val tags: Set<String> = hashSetOf(), // todo: enum?
+
+    // returns Error message if the card cannot be played
+    val validator: Validator? = null,
 
     // instance section
-    val properties: MutableMap<String, Int>, // todo: enum keys?
+    val properties: MutableMap<String, Int> = hashMapOf(), // todo: enum keys?
     val id: String = UUID.randomUUID().toString(),
-    val onApply: (() -> Unit)?,
-    val onTick: (() -> Unit)?,
+    val onApply: (() -> Unit)? = null,
+    val onTick: (() -> Unit)? = null,
     var ttl: Int = 0,
-    val onExpire: (() -> Unit)?,
+    val onExpire: (() -> Unit)? = null,
 )
 
 sealed class GameUpdate(
@@ -68,6 +75,10 @@ data class GameSession(
         updates.offer(update)
     }
 
+    private fun unicast(update: GameUpdate, player: SessionPlayer) {
+        player.updates.offer(update)
+    }
+
     private fun changeStatus(newState: GameSessionStatus) {
         status = newState
         updates.offer(GameStatusUpdate(newState))
@@ -91,11 +102,15 @@ data class GameSession(
         // Validations
 
         // todo: change playerName to jwt validation
-        if (playerName != player1.name && playerName != player2.name)
-            throw GameException("No such player: $playerName")
+        if (playerName != player1.name && playerName != player2.name) {
+            println("No such player: $playerName")
+            return
+        }
 
-        if (status == Created)
-            throw GameException("Game is not started")
+        if (status == Created) {
+            broadcast(GameMessageUpdate("Game is not started yet"))
+            return
+        }
 
         if (status == Player_1_Won || status == Player_2_Won) {
             broadcast(GameMessageUpdate("Game is finished, start a new game"))
@@ -103,16 +118,41 @@ data class GameSession(
         }
 
         val currentPlayer = if (status == Player_1_Turn) player1 else player2
+        val enemyPlayer = if (status == Player_2_Turn) player1 else player2
 
         if (playerName != currentPlayer.name) {
-            broadcast(GameMessageUpdate("It is ${currentPlayer.name}'s turn!"))
+            unicast(GameMessageUpdate("It is ${currentPlayer.name}'s turn!"), if (playerName == player1.name) player1 else player2)
             return
         }
 
+        // skipping turn
         if (cardId == null) {
-            // skipping turn
+            // todo: apply current effects
             changeStatus(if (status == Player_1_Turn) Player_2_Turn else Player_1_Turn)
+            return
         }
+
+        // selected card or effect exists
+        val card = currentPlayer.cards[cardId] ?: currentPlayer.effects[cardId]
+        if (card == null) {
+            unicast(GameMessageUpdate("Error! No such card!"), currentPlayer)
+            return
+        }
+
+        val targetEffect = currentPlayer.effects[target] ?: enemyPlayer.effects[target]
+
+        if (target != null && targetEffect == null) {
+            unicast(GameMessageUpdate("Target not found!"), currentPlayer)
+            return
+        }
+
+        val cardError = card.validator?.validate(card, currentPlayer, enemyPlayer, targetEffect)
+        if (cardError != null) {
+            unicast(GameMessageUpdate(cardError), currentPlayer)
+            return
+        }
+
+        // todo: everything else
     }
 
 }
