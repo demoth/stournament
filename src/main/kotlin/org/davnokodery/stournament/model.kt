@@ -22,9 +22,7 @@ data class Card(
     @JsonIgnore val params: MutableMap<String, Int> = mutableMapOf(),
     var turns: Int = 1,
     val id: String = UUID.randomUUID().toString()
-) {
-    fun getasdf(): Int = 4
-}
+)
 
 data class ErrorResponse(val message: String)
 
