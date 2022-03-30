@@ -9,6 +9,11 @@ fun interface Validator {
     fun validate(self: Card, owner: SessionPlayer, enemy: SessionPlayer, targetEffect: Card?): String?
 }
 
+fun interface CardAction {
+    fun activate(self: Card, owner: SessionPlayer, enemy: SessionPlayer, targetEffect: Card?)
+}
+
+// todo: split into Card and Effect?
 data class Card(
     // template section
     val name: String,
@@ -22,10 +27,10 @@ data class Card(
     // instance section
     val properties: MutableMap<String, Int> = hashMapOf(), // todo: enum keys?
     val id: String = UUID.randomUUID().toString(),
-    val onApply: (() -> Unit)? = null,
-    val onTick: (() -> Unit)? = null,
+    val onApply: CardAction? = null,
+    val onTick: CardAction? = null,
+    val onExpire: CardAction? = null,
     var ttl: Int = 0,
-    val onExpire: (() -> Unit)? = null,
 )
 
 sealed class GameUpdate(
@@ -94,7 +99,7 @@ data class GameSession(
 
     /**
      * @param playerName - current player name, todo: switch to jwt,
-     * @param cardId - either id of the card in the hand or the effect card id, when null - skipping turn,
+     * @param cardId - either id of the card in the hand or the effect card id, when null - end turn,
      * @param target - id of the card to apply effect to (if applicable)
      */
     fun play(playerName: String, cardId: String? = null, target: String? = null) {
@@ -125,7 +130,7 @@ data class GameSession(
             return
         }
 
-        // skipping turn
+        // end turn
         if (cardId == null) {
             // todo: apply current effects
             changeStatus(if (status == Player_1_Turn) Player_2_Turn else Player_1_Turn)
@@ -152,7 +157,7 @@ data class GameSession(
             return
         }
 
-        // todo: everything else
+        card.onApply?.activate(card, currentPlayer, enemyPlayer, targetEffect)
     }
 
 }

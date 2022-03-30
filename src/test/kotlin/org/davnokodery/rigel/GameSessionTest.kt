@@ -12,24 +12,40 @@ internal class GameSessionTest {
     lateinit var player2: SessionPlayer
     lateinit var newGame: GameSession
 
+    var cardPlayed = false;
+
     @BeforeEach
     fun setup() {
 
-        val testCard1 = Card(
+
+        val invalidCard = Card(
             id = "invalid1",
             name = "test1",
             iconName = "test1 icon",
             description = "test1 description",
-            validator = Validator { _, _, _, _ ->
+            validator = { _, _, _, _ ->
                 "Not allowed"
             }
         )
-        val testCard2 = Card(id = "valid2", name = "test2", iconName = "test2 icon", description = "test2 description")
+
+        val validCard = Card(
+            id = "valid2",
+            name = "test2",
+            iconName = "test2 icon",
+            description = "test2 description",
+            validator = { _, _, _, _ ->
+                if (cardPlayed) "already played" else null
+            },
+            onApply = { _, _, _, _ ->
+                cardPlayed = true
+            })
+
         player1 = SessionPlayer("player1").apply {
-            cards[testCard1.id] = testCard1
+            cards[invalidCard.id] = invalidCard
         }
+
         player2 = SessionPlayer("player2").apply {
-            cards[testCard2.id] = testCard2
+            cards[validCard.id] = validCard
 
         }
         newGame = GameSession(player1, player2)
@@ -70,11 +86,11 @@ internal class GameSessionTest {
     }
 
     @Test
-    fun `play - skip turn`() {
+    fun `play - end turn`() {
         newGame.startGame()
         val oldStatus = newGame.status
         val currentPlayerName = if (oldStatus == GameSessionStatus.Player_1_Turn) player1.name else player2.name
-        // skip turn
+        // end turn
         newGame.play(currentPlayerName)
         assertNotEquals(oldStatus, newGame.status)
     }
@@ -133,8 +149,18 @@ internal class GameSessionTest {
         newGame.status = GameSessionStatus.Player_1_Turn
         // skip turn
         newGame.play(player1.name, "invalid1")
-        val gameUpdate = player1.updates.poll() as? GameMessageUpdate
-        assertEquals("Not allowed", gameUpdate?.message)
+        val playerUpdate = player1.updates.poll() as? GameMessageUpdate
+        assertEquals("Not allowed", playerUpdate?.message)
+    }
+
+    @Test
+    fun `play - play a card`() {
+        newGame.startGame()
+        newGame.status = GameSessionStatus.Player_2_Turn
+        newGame.play(player2.name, "valid2")
+        assertTrue(player2.updates.isEmpty(), "Unexpected updates: ${player2.updates}")
+        assertTrue(cardPlayed, "Card was not played!")
+
     }
 
 
