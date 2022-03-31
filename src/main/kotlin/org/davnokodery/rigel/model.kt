@@ -1,7 +1,6 @@
 package org.davnokodery.rigel
 
 import org.davnokodery.rigel.GameSessionStatus.*
-import org.davnokodery.stournament.GameException
 import java.util.*
 import java.util.concurrent.ConcurrentLinkedQueue
 
@@ -11,6 +10,10 @@ fun interface Validator {
 
 fun interface CardAction {
     fun activate(self: Card, owner: SessionPlayer, enemy: SessionPlayer, targetEffect: Card?)
+}
+
+fun interface CardEffect {
+    fun effect(self: Card, owner: SessionPlayer, enemy: SessionPlayer)
 }
 
 // todo: split into Card and Effect?
@@ -27,19 +30,24 @@ data class Card(
     // instance section
     val properties: MutableMap<String, Int> = hashMapOf(), // todo: enum keys?
     val id: String = UUID.randomUUID().toString(),
+    /**
+     * Instant action related the played card, the card can save the reference to the target,
+     * but should check it is still valid (not expired)
+     */
     val onApply: CardAction? = null,
-    val onTick: CardAction? = null,
-    val onExpire: CardAction? = null,
-    var ttl: Int = 0,
+    val onTick: CardEffect? = null,
+    val onExpire: CardEffect? = null,
+    var ttl: Int = 0, // when reaches 0 the effect expires
 )
 
 sealed class GameUpdate(
-    val id: String = UUID.randomUUID().toString(),
+    val id: String = UUID.randomUUID().toString(), // todo -> change to the incrementing counter (owner: GameSession)
 )
 
 data class GameStatusUpdate(val newStatus: GameSessionStatus) : GameUpdate()
 data class GameMessageUpdate(val message: String) : GameUpdate()
-data class PlayerPropertyChange(val playerName: String, val property: PlayerProperty, val delta: Int)
+data class PlayerPropertyChange(val playerName: String, val property: PlayerProperty, val delta: Int): GameUpdate()
+data class CardPlayed(val cardId: String, val discarded: Boolean): GameUpdate()
 
 enum class PlayerProperty {
     Health
@@ -98,6 +106,7 @@ data class GameSession(
     }
 
     /**
+     * Run the game logic of the user playing a card.
      * @param playerName - current player name, todo: switch to jwt,
      * @param cardId - either id of the card in the hand or the effect card id, when null - end turn,
      * @param target - id of the card to apply effect to (if applicable)
@@ -132,32 +141,54 @@ data class GameSession(
 
         // end turn
         if (cardId == null) {
-            // todo: apply current effects
+            // activate current effects
+            val expired = currentPlayer.effects.values.filter {
+                it.onTick?.effect(it, currentPlayer, enemyPlayer)
+                it.ttl--
+                if (it.ttl <= 0) {
+                    it.onExpire?.effect(it, currentPlayer, enemyPlayer)
+                }
+                it.ttl <= 0
+            }
+            // remove the expired effects and sent updates
+            expired.forEach {
+                currentPlayer.effects.remove(it.id)
+                broadcast(CardPlayed(it.id, true))
+            }
             changeStatus(if (status == Player_1_Turn) Player_2_Turn else Player_1_Turn)
-            return
+        } else {
+
+            // selected card or effect exists
+            val card = currentPlayer.cards[cardId] ?: currentPlayer.effects[cardId]
+            if (card == null) {
+                unicast(GameMessageUpdate("Error! No such card!"), currentPlayer)
+                return
+            }
+
+            val targetEffect = currentPlayer.effects[target] ?: enemyPlayer.effects[target]
+
+            if (target != null && targetEffect == null) {
+                unicast(GameMessageUpdate("Target not found!"), currentPlayer)
+                return
+            }
+
+            val cardError = card.validator?.validate(card, currentPlayer, enemyPlayer, targetEffect)
+            if (cardError != null) {
+                unicast(GameMessageUpdate(cardError), currentPlayer)
+                return
+            }
+
+            card.onApply?.activate(card, currentPlayer, enemyPlayer, targetEffect)
+            currentPlayer.cards.remove(card.id)
+            if (card.ttl > 0) {
+                // if a card has a lasting effect -> move it to the current effects
+                currentPlayer.effects[card.id] = card
+                broadcast(CardPlayed(card.id, false))
+            } else {
+                // discard otherwise
+                broadcast(CardPlayed(card.id, true))
+            }
         }
-
-        // selected card or effect exists
-        val card = currentPlayer.cards[cardId] ?: currentPlayer.effects[cardId]
-        if (card == null) {
-            unicast(GameMessageUpdate("Error! No such card!"), currentPlayer)
-            return
-        }
-
-        val targetEffect = currentPlayer.effects[target] ?: enemyPlayer.effects[target]
-
-        if (target != null && targetEffect == null) {
-            unicast(GameMessageUpdate("Target not found!"), currentPlayer)
-            return
-        }
-
-        val cardError = card.validator?.validate(card, currentPlayer, enemyPlayer, targetEffect)
-        if (cardError != null) {
-            unicast(GameMessageUpdate(cardError), currentPlayer)
-            return
-        }
-
-        card.onApply?.activate(card, currentPlayer, enemyPlayer, targetEffect)
     }
 
 }
