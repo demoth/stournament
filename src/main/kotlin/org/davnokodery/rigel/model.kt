@@ -31,7 +31,7 @@ data class Card(
     val properties: MutableMap<String, Int> = hashMapOf(), // todo: enum keys?
     val id: String = UUID.randomUUID().toString(),
     /**
-     * Instant action related the played card, the card can save the reference to the target,
+     * Instant action related the played card, the card can save the id of the target,
      * but should check it is still valid (not expired)
      */
     val onApply: CardAction? = null,
@@ -50,7 +50,8 @@ data class PlayerPropertyChange(val playerName: String, val property: PlayerProp
 data class CardPlayed(val cardId: String, val discarded: Boolean): GameUpdate()
 
 enum class PlayerProperty {
-    Health
+    Health,
+    MaxHealth
 }
 
 data class SessionPlayer(
@@ -60,11 +61,10 @@ data class SessionPlayer(
     val effects: MutableMap<String, Card> = hashMapOf(),
     val updates: Queue<GameUpdate> = ConcurrentLinkedQueue() // player specific updates
 ) {
-    fun changeProperty(property: PlayerProperty, delta: Int): PlayerPropertyChange {
+    fun changeProperty(property: PlayerProperty, delta: Int) {
         val oldValue = properties[property]!!
         properties[property] = oldValue + delta
-
-        return PlayerPropertyChange(name, property, delta)
+        updates.offer(PlayerPropertyChange(name, property, delta))
     }
 }
 
@@ -77,11 +77,11 @@ enum class GameSessionStatus {
 }
 
 data class GameSession(
-    val player1: SessionPlayer,
-    val player2: SessionPlayer,
-    val updates: Queue<GameUpdate> = ConcurrentLinkedQueue(), // common updates
-    var status: GameSessionStatus = Created,
-    var turn: Int = 1,
+    private val player1: SessionPlayer,
+    private val player2: SessionPlayer,
+    internal val updates: Queue<GameUpdate> = ConcurrentLinkedQueue(), // common updates
+    internal var status: GameSessionStatus = Created,
+    private var turn: Int = 1,
 
     ) {
     private fun broadcast(update: GameUpdate) {
@@ -94,7 +94,7 @@ data class GameSession(
 
     private fun changeStatus(newState: GameSessionStatus) {
         status = newState
-        updates.offer(GameStatusUpdate(newState))
+        broadcast(GameStatusUpdate(newState))
     }
 
     fun startGame() {
@@ -139,24 +139,7 @@ data class GameSession(
             return
         }
 
-        // end turn
-        if (cardId == null) {
-            // activate current effects
-            val expired = currentPlayer.effects.values.filter {
-                it.onTick?.effect(it, currentPlayer, enemyPlayer)
-                it.ttl--
-                if (it.ttl <= 0) {
-                    it.onExpire?.effect(it, currentPlayer, enemyPlayer)
-                }
-                it.ttl <= 0
-            }
-            // remove the expired effects and sent updates
-            expired.forEach {
-                currentPlayer.effects.remove(it.id)
-                broadcast(CardPlayed(it.id, true))
-            }
-            changeStatus(if (status == Player_1_Turn) Player_2_Turn else Player_1_Turn)
-        } else {
+        if (cardId != null) {
 
             // selected card or effect exists
             val card = currentPlayer.cards[cardId] ?: currentPlayer.effects[cardId]
@@ -188,6 +171,23 @@ data class GameSession(
                 // discard otherwise
                 broadcast(CardPlayed(card.id, true))
             }
+        } else {
+            // end turn
+            // activate current effects
+            val expiredEffects = currentPlayer.effects.values.filter {
+                it.onTick?.effect(it, currentPlayer, enemyPlayer)
+                it.ttl--
+                if (it.ttl <= 0) {
+                    it.onExpire?.effect(it, currentPlayer, enemyPlayer)
+                }
+                it.ttl <= 0
+            }
+            // remove the expired effects and sent updates
+            expiredEffects.forEach {
+                currentPlayer.effects.remove(it.id)
+                broadcast(CardPlayed(it.id, true))
+            }
+            changeStatus(if (status == Player_1_Turn) Player_2_Turn else Player_1_Turn)
         }
     }
 

@@ -8,45 +8,58 @@ import org.junit.jupiter.api.BeforeEach
 
 internal class GameSessionTest {
 
-    lateinit var player1: SessionPlayer
-    lateinit var player2: SessionPlayer
-    lateinit var newGame: GameSession
+    private lateinit var player1: SessionPlayer
+    private lateinit var player2: SessionPlayer
+    private lateinit var newGame: GameSession
 
-    var cardPlayed = false;
+    var cardPlayed = false
+
+    private fun initPlayer(player: SessionPlayer, playerId: Int) {
+        player.properties[PlayerProperty.Health] = 100
+        player.properties[PlayerProperty.MaxHealth] = 100
+
+        createHealingCard(playerId).let { player.cards[it.id] = it }
+        createFireballCard(playerId).let { player.cards[it.id] = it }
+    }
+
+    private fun createHealingCard(player: Int) = Card(
+        id = "healing$player",
+        name = "healing$player",
+        iconName = "healing$player",
+        description = "heal 1 hp for 3 turns",
+        validator = { _, p, _, _ ->
+            if (p.properties[PlayerProperty.Health]!! >= p.properties[PlayerProperty.MaxHealth]!!)
+                "Health is already full"
+            else
+                null
+        },
+        onTick = { _, p, _ ->
+            if (p.properties[PlayerProperty.Health]!! < p.properties[PlayerProperty.MaxHealth]!!) {
+                p.changeProperty(PlayerProperty.Health, 1)
+            }
+        },
+        ttl = 2
+    )
+
+    // todo: use damage function instead of direct property manipulation
+    private fun createFireballCard(player: Int) = Card(
+        id = "fireball$player",
+        name = "fireball$player",
+        iconName = "fireball$player",
+        description = "fireball$player",
+        onApply = { _, _, e, _ ->
+            e.changeProperty(PlayerProperty.Health, -5)
+        })
 
     @BeforeEach
     fun setup() {
 
-
-        val invalidCard = Card(
-            id = "invalid1",
-            name = "test1",
-            iconName = "test1 icon",
-            description = "test1 description",
-            validator = { _, _, _, _ ->
-                "Not allowed"
-            }
-        )
-
-        val validCard = Card(
-            id = "valid2",
-            name = "test2",
-            iconName = "test2 icon",
-            description = "test2 description",
-            validator = { _, _, _, _ ->
-                if (cardPlayed) "already played" else null
-            },
-            onApply = { _, _, _, _ ->
-                cardPlayed = true
-            })
-
         player1 = SessionPlayer("player1").apply {
-            cards[invalidCard.id] = invalidCard
+            initPlayer(this, 1)
         }
 
         player2 = SessionPlayer("player2").apply {
-            cards[validCard.id] = validCard
-
+            initPlayer(this, 2)
         }
         newGame = GameSession(player1, player2)
     }
@@ -54,6 +67,12 @@ internal class GameSessionTest {
     @AfterEach
     fun printUpdates() {
         newGame.updates.forEach {
+            println(it)
+        }
+        player1.updates.forEach {
+            println(it)
+        }
+        player2.updates.forEach {
             println(it)
         }
     }
@@ -144,24 +163,40 @@ internal class GameSessionTest {
     }
 
     @Test
-    fun `play - card could not be played`() {
+    fun `play - card could not be played due to validation`() {
         newGame.startGame()
         newGame.status = GameSessionStatus.Player_1_Turn
         // skip turn
-        newGame.play(player1.name, "invalid1")
+        newGame.play(player1.name, "healing1")
         val playerUpdate = player1.updates.poll() as? GameMessageUpdate
-        assertEquals("Not allowed", playerUpdate?.message)
+        assertEquals("Health is already full", playerUpdate?.message)
     }
 
     @Test
-    fun `play - play a card`() {
+    fun `play - play a spell card`() {
         newGame.startGame()
         newGame.status = GameSessionStatus.Player_2_Turn
-        newGame.play(player2.name, "valid2")
+        newGame.updates.clear()
+        newGame.play(player2.name, "fireball2")
         assertTrue(player2.updates.isEmpty(), "Unexpected updates: ${player2.updates}")
-        assertTrue(cardPlayed, "Card was not played!")
-
+        assertEquals(95, player1.properties[PlayerProperty.Health])
+        val cardPlayed = newGame.updates.poll() as? CardPlayed
+        assertEquals("fireball2", cardPlayed?.cardId)
+        assertEquals(true, cardPlayed?.discarded)
     }
 
+    @Test
+    fun `play - play a card with lasting effect`() {
+        newGame.startGame()
+        newGame.status = GameSessionStatus.Player_1_Turn
+        player1.changeProperty(PlayerProperty.Health, -50)
+        newGame.play(player1.name, "healing1")
+        newGame.play(player1.name) //end turn
+        newGame.play(player2.name) //end turn
+        newGame.play(player1.name) //end turn
+
+        assertEquals(52, player1.properties[PlayerProperty.Health])
+        assertNotNull(newGame.updates.find { it is CardPlayed && it.cardId == "healing1" && it.discarded }, "Card did not expire")
+    }
 
 }

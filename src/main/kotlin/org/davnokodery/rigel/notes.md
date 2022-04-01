@@ -1,3 +1,5 @@
+# Draft model classes
+
 card
  * name
  * image
@@ -44,3 +46,19 @@ updates:
  * playerTurnChange
  * gameFinished(standings)
  * inviteUpdate(joinSession)
+
+---
+
+# Card examples
+
+ * Damage: Fire, Cold, Lightning, Physical, Poison, Holy, Unholy
+ * Types: Spell, Curse, Enchantment, Summon, Item
+ * Creatures: Elemental, Animal, Demon, Undead, 
+
+# Card effects api:
+
+ * change player property
+ * deal damage / heal
+ * add/remove card (by target, tag or random)
+ * add/remove effect (by target, tag or random)
+ * change effect property
