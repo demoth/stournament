@@ -48,15 +48,14 @@ data class Card(
 )
 
 
-
 sealed class GameUpdate(
     val id: String = UUID.randomUUID().toString(), // todo -> change to the incrementing counter (owner: GameSession)
 )
 
 data class GameStatusUpdate(val newStatus: GameSessionStatus) : GameUpdate()
 data class GameMessageUpdate(val message: String) : GameUpdate()
-data class PlayerPropertyChange(val playerName: String, val property: PlayerProperty, val delta: Int): GameUpdate()
-data class CardPlayed(val cardId: String, val discarded: Boolean): GameUpdate()
+data class PlayerPropertyChange(val playerName: String, val property: PlayerProperty, val delta: Int) : GameUpdate()
+data class CardPlayed(val cardId: String, val discarded: Boolean) : GameUpdate()
 
 enum class PlayerProperty {
     Health,
@@ -73,8 +72,8 @@ data class SessionPlayer(
 
 ) {
 
-    fun getProperty(property: PlayerProperty ): Int {
-        return properties[property]!! + (propertyChanges[property]?.values?.sum() ?:0)
+    fun getProperty(property: PlayerProperty): Int {
+        return properties[property]!! + (propertyChanges[property]?.values?.sum() ?: 0)
     }
 
     fun changeProperty(property: PlayerProperty, delta: Int) {
@@ -166,7 +165,10 @@ data class GameSession(
         val enemyPlayer = if (status == Player_2_Turn) player1 else player2
 
         if (playerName != currentPlayer.name) {
-            unicast(GameMessageUpdate("It is ${currentPlayer.name}'s turn!"), if (playerName == player1.name) player1 else player2)
+            unicast(
+                GameMessageUpdate("It is ${currentPlayer.name}'s turn!"),
+                if (playerName == player1.name) player1 else player2
+            )
             return
         }
 
@@ -210,6 +212,9 @@ data class GameSession(
                 it.ttl--
                 if (it.ttl <= 0) {
                     it.onExpire?.effect(it, currentPlayer, enemyPlayer)
+                    listOf(player1, player2).forEach { p ->
+                        p.propertyChanges.values.forEach { c -> c.remove(it.id) }
+                    }
                 }
                 it.ttl <= 0
             }
