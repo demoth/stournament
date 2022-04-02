@@ -59,7 +59,8 @@ data class CardPlayed(val cardId: String, val discarded: Boolean) : GameUpdate()
 
 enum class PlayerProperty {
     Health,
-    MaxHealth
+    MaxHealth,
+    ColdResist
 }
 
 data class SessionPlayer(

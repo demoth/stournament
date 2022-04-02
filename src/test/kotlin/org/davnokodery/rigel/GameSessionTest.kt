@@ -13,12 +13,13 @@ internal class GameSessionTest {
     private lateinit var player2: SessionPlayer
     private lateinit var newGame: GameSession
 
-    private fun initPlayer(player: SessionPlayer, playerId: Int) {
+    private fun initPlayer(player: SessionPlayer, playerId: String) {
         createHealingCard(playerId).let { player.cards[it.id] = it }
         createFireballCard(playerId).let { player.cards[it.id] = it }
+        createIceShieldCard(playerId).let { player.cards[it.id] = it }
     }
 
-    private fun createHealingCard(player: Int) = Card(
+    private fun createHealingCard(player: String) = Card(
         id = "healing$player",
         name = "healing$player",
         iconName = "healing$player",
@@ -38,7 +39,7 @@ internal class GameSessionTest {
     )
 
     // todo: use damage function instead of direct property manipulation
-    private fun createFireballCard(player: Int) = Card(
+    private fun createFireballCard(player: String) = Card(
         id = "fireball$player",
         name = "fireball$player",
         iconName = "fireball$player",
@@ -47,18 +48,35 @@ internal class GameSessionTest {
             e.changeProperty(PlayerProperty.Health, -5)
         })
 
+    private fun createIceShieldCard(player: String) = Card(
+        id = "iceShield$player",
+        name = "iceShield$player",
+        iconName = "iceShield$player",
+        description = "iceShield$player",
+        ttl = 2,
+        onApply = { _, p, _, _ ->
+            p.changePropertyTemporary(PlayerProperty.ColdResist, 15, "iceShield$player")
+        })
+
     @BeforeEach
     fun setup() {
-
-        player1 = SessionPlayer(name = "player1", properties = EnumMap(mapOf(PlayerProperty.Health to 100, PlayerProperty.MaxHealth to 100) )).apply {
-            initPlayer(this, 1)
-        }
-
-        player2 = SessionPlayer(name = "player2", properties = EnumMap(mapOf(PlayerProperty.Health to 100, PlayerProperty.MaxHealth to 100) )).apply {
-            initPlayer(this, 2)
-        }
+        player1 = createTestPlayer("1")
+        player2 = createTestPlayer("2")
         newGame = GameSession(player1, player2)
     }
+
+    private fun createTestPlayer(id: String) =
+        SessionPlayer(
+            name = "player$id", properties = EnumMap(
+                mapOf(
+                    PlayerProperty.Health to 100,
+                    PlayerProperty.MaxHealth to 100,
+                    PlayerProperty.ColdResist to 0,
+                )
+            )
+        ).apply {
+            initPlayer(this, id)
+        }
 
     @AfterEach
     fun printUpdates() {
@@ -192,7 +210,22 @@ internal class GameSessionTest {
         newGame.play(player1.name) //end turn
 
         assertEquals(52, player1.getProperty(PlayerProperty.Health))
-        assertNotNull(newGame.updates.find { it is CardPlayed && it.cardId == "healing1" && it.discarded }, "Card did not expire")
+        assertNotNull(
+            newGame.updates.find { it is CardPlayed && it.cardId == "healing1" && it.discarded },
+            "Card did not expire"
+        )
     }
 
+    @Test
+    fun `play - play a card with temporary property change effect`() {
+        newGame.startGame()
+        newGame.status = GameSessionStatus.Player_1_Turn
+        newGame.play(player1.name, "iceShield1")
+        assertEquals(15, player1.getProperty(PlayerProperty.ColdResist))
+        newGame.play(player1.name) //end turn 1
+        newGame.play(player2.name) //end turn 1
+        assertEquals(15, player1.getProperty(PlayerProperty.ColdResist))
+        newGame.play(player1.name) //end turn 2
+        assertEquals(0, player1.getProperty(PlayerProperty.ColdResist))
+    }
 }
