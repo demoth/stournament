@@ -65,4 +65,4 @@ updates:
 
  * random property change
 
- * getHealth() = base_health * getIncreased() + getFlat_health()
+ * getHealth() = base_health * getIncreased(1 + 0.01 + 0.02 + (-0.01)) + getFlat_health()

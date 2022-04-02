@@ -1,10 +1,13 @@
 package org.davnokodery.rigel
 
 import org.davnokodery.rigel.GameSessionStatus.*
+import org.slf4j.LoggerFactory
 import java.util.*
 import java.util.concurrent.ConcurrentLinkedQueue
 import javax.persistence.Entity
 import javax.persistence.Id
+
+val logger = LoggerFactory.getLogger("model.kt")
 
 fun interface Validator {
     fun validate(self: Card, owner: SessionPlayer, enemy: SessionPlayer, targetEffect: Card?): String?
@@ -77,6 +80,20 @@ data class SessionPlayer(
     fun changeProperty(property: PlayerProperty, delta: Int) {
         val oldValue = properties[property]!!
         properties[property] = oldValue + delta
+        // todo need to calculate new values for health or mana and broadcast them
+        updates.offer(PlayerPropertyChange(name, property, delta))
+    }
+
+    fun changePropertyTemporary(property: PlayerProperty, delta: Int, cardId: String) {
+        val changes = propertyChanges[property]
+
+        if (changes == null) {
+            propertyChanges[property] = mutableMapOf(cardId to delta)
+        } else {
+            changes[cardId] = delta
+        }
+
+        // todo need to calculate new values for health or mana and broadcast them
         updates.offer(PlayerPropertyChange(name, property, delta))
     }
 }
