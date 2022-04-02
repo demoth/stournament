@@ -3,6 +3,8 @@ package org.davnokodery.rigel
 import org.davnokodery.rigel.GameSessionStatus.*
 import java.util.*
 import java.util.concurrent.ConcurrentLinkedQueue
+import javax.persistence.Entity
+import javax.persistence.Id
 
 fun interface Validator {
     fun validate(self: Card, owner: SessionPlayer, enemy: SessionPlayer, targetEffect: Card?): String?
@@ -192,3 +194,18 @@ data class GameSession(
     }
 
 }
+
+@Entity
+data class User(
+    @Id var name: String,
+    var password: String
+)
+
+data class LoginRequest(
+    val name: String,
+    val password: String
+)
+
+data class LoginResponse(
+    val jwt: String
+)

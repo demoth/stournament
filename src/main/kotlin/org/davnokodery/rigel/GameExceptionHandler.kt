@@ -1,5 +1,6 @@
-package org.davnokodery.stournament
+package org.davnokodery.rigel
 
+import org.davnokodery.stournament.ErrorResponse
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ControllerAdvice
 import org.springframework.web.bind.annotation.ExceptionHandler

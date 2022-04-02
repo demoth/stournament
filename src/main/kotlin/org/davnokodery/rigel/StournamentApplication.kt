@@ -1,4 +1,4 @@
-package org.davnokodery.stournament
+package org.davnokodery.rigel
 
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
