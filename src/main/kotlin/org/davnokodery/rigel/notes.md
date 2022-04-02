@@ -62,3 +62,7 @@ updates:
  * add/remove card (by target, tag or random)
  * add/remove effect (by target, tag or random)
  * change effect property
+
+ * random property change
+
+ * getHealth() = base_health * getIncreased() + getFlat_health()

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test
 
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
+import java.util.*
 
 internal class GameSessionTest {
 
@@ -12,12 +13,7 @@ internal class GameSessionTest {
     private lateinit var player2: SessionPlayer
     private lateinit var newGame: GameSession
 
-    var cardPlayed = false
-
     private fun initPlayer(player: SessionPlayer, playerId: Int) {
-        player.properties[PlayerProperty.Health] = 100
-        player.properties[PlayerProperty.MaxHealth] = 100
-
         createHealingCard(playerId).let { player.cards[it.id] = it }
         createFireballCard(playerId).let { player.cards[it.id] = it }
     }
@@ -28,13 +24,13 @@ internal class GameSessionTest {
         iconName = "healing$player",
         description = "heal 1 hp for 3 turns",
         validator = { _, p, _, _ ->
-            if (p.properties[PlayerProperty.Health]!! >= p.properties[PlayerProperty.MaxHealth]!!)
+            if (p.getProperty(PlayerProperty.Health) >= p.getProperty(PlayerProperty.MaxHealth))
                 "Health is already full"
             else
                 null
         },
         onTick = { _, p, _ ->
-            if (p.properties[PlayerProperty.Health]!! < p.properties[PlayerProperty.MaxHealth]!!) {
+            if (p.getProperty(PlayerProperty.Health) < p.getProperty(PlayerProperty.MaxHealth)) {
                 p.changeProperty(PlayerProperty.Health, 1)
             }
         },
@@ -54,11 +50,11 @@ internal class GameSessionTest {
     @BeforeEach
     fun setup() {
 
-        player1 = SessionPlayer("player1").apply {
+        player1 = SessionPlayer(name = "player1", properties = EnumMap(mapOf(PlayerProperty.Health to 100, PlayerProperty.MaxHealth to 100) )).apply {
             initPlayer(this, 1)
         }
 
-        player2 = SessionPlayer("player2").apply {
+        player2 = SessionPlayer(name = "player2", properties = EnumMap(mapOf(PlayerProperty.Health to 100, PlayerProperty.MaxHealth to 100) )).apply {
             initPlayer(this, 2)
         }
         newGame = GameSession(player1, player2)
@@ -179,7 +175,7 @@ internal class GameSessionTest {
         newGame.updates.clear()
         newGame.play(player2.name, "fireball2")
         assertTrue(player2.updates.isEmpty(), "Unexpected updates: ${player2.updates}")
-        assertEquals(95, player1.properties[PlayerProperty.Health])
+        assertEquals(95, player1.getProperty(PlayerProperty.Health))
         val cardPlayed = newGame.updates.poll() as? CardPlayed
         assertEquals("fireball2", cardPlayed?.cardId)
         assertEquals(true, cardPlayed?.discarded)
@@ -195,7 +191,7 @@ internal class GameSessionTest {
         newGame.play(player2.name) //end turn
         newGame.play(player1.name) //end turn
 
-        assertEquals(52, player1.properties[PlayerProperty.Health])
+        assertEquals(52, player1.getProperty(PlayerProperty.Health))
         assertNotNull(newGame.updates.find { it is CardPlayed && it.cardId == "healing1" && it.discarded }, "Card did not expire")
     }
 

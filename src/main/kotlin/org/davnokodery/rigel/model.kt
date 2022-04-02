@@ -19,6 +19,8 @@ fun interface CardEffect {
 }
 
 // todo: split into Card and Effect?
+typealias CardId = String;
+
 data class Card(
     // template section
     val name: String,
@@ -31,7 +33,7 @@ data class Card(
 
     // instance section
     val properties: MutableMap<String, Int> = hashMapOf(), // todo: enum keys?
-    val id: String = UUID.randomUUID().toString(),
+    val id: CardId = UUID.randomUUID().toString(),
     /**
      * Instant action related the played card, the card can save the id of the target,
      * but should check it is still valid (not expired)
@@ -41,6 +43,8 @@ data class Card(
     val onExpire: CardEffect? = null,
     var ttl: Int = 0, // when reaches 0 the effect expires
 )
+
+
 
 sealed class GameUpdate(
     val id: String = UUID.randomUUID().toString(), // todo -> change to the incrementing counter (owner: GameSession)
@@ -58,11 +62,18 @@ enum class PlayerProperty {
 
 data class SessionPlayer(
     val name: String,
-    val properties: EnumMap<PlayerProperty, Int> = EnumMap(PlayerProperty::class.java),
-    val cards: MutableMap<String, Card> = hashMapOf(),
+    private val properties: EnumMap<PlayerProperty, Int> = EnumMap(PlayerProperty::class.java),
+    val propertyChanges: EnumMap<PlayerProperty, MutableMap<CardId, Int>> = EnumMap(PlayerProperty::class.java),
+    val cards: MutableMap<String, Card> = hashMapOf(), // todo make it private
     val effects: MutableMap<String, Card> = hashMapOf(),
-    val updates: Queue<GameUpdate> = ConcurrentLinkedQueue() // player specific updates
+    val updates: Queue<GameUpdate> = ConcurrentLinkedQueue(), // player specific updates
+
 ) {
+
+    fun getProperty(property: PlayerProperty ): Int {
+        return properties[property]!! + (propertyChanges[property]?.values?.sum() ?:0)
+    }
+
     fun changeProperty(property: PlayerProperty, delta: Int) {
         val oldValue = properties[property]!!
         properties[property] = oldValue + delta
@@ -107,6 +118,7 @@ data class GameSession(
         }
     }
 
+    // todo end turn move to another function
     /**
      * Run the game logic of the user playing a card.
      * @param playerName - current player name, todo: switch to jwt,
