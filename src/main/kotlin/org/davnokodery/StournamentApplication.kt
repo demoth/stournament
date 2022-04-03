@@ -1,4 +1,4 @@
-package org.davnokodery.rigel
+package org.davnokodery
 
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication

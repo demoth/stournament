@@ -42,8 +42,17 @@ data class Card(
      * but should check it is still valid (not expired)
      */
     val onApply: CardAction? = null,
+
+    // effect related, todo: make more explicit ?
+
+    // invoked at owners turn
     val onTick: CardEffect? = null,
+    // invoked when ttl reaches 0
     val onExpire: CardEffect? = null,
+    /**
+     * decremented at the end of the owning player's turn.
+     * TTL = 2 means 2 owning player turns and 1 enemy player's turn.
+     */
     var ttl: Int = 0, // when reaches 0 the effect expires
 )
 
@@ -60,13 +69,14 @@ data class CardPlayed(val cardId: String, val discarded: Boolean) : GameUpdate()
 enum class PlayerProperty {
     Health,
     MaxHealth,
-    ColdResist
+    ColdResist,
+    FireResist,
 }
 
 data class SessionPlayer(
     val name: String,
     private val properties: EnumMap<PlayerProperty, Int> = EnumMap(PlayerProperty::class.java),
-    val propertyChanges: EnumMap<PlayerProperty, MutableMap<CardId, Int>> = EnumMap(PlayerProperty::class.java),
+    private val propertyChanges: EnumMap<PlayerProperty, MutableMap<CardId, Int>> = EnumMap(PlayerProperty::class.java),
     val cards: MutableMap<String, Card> = hashMapOf(), // todo make it private
     val effects: MutableMap<String, Card> = hashMapOf(),
     val updates: Queue<GameUpdate> = ConcurrentLinkedQueue(), // player specific updates
@@ -84,12 +94,25 @@ data class SessionPlayer(
         updates.offer(PlayerPropertyChange(name, property, delta))
     }
 
+    fun removeTemporaryPropertyChange(id: CardId) {
+        propertyChanges.forEach { (property, changes) ->
+            val oldDelta = changes.remove(id)
+            if (oldDelta != null) {
+                updates.offer(PlayerPropertyChange(name, property, -oldDelta))
+            }
+        }
+    }
+
     fun changePropertyTemporary(property: PlayerProperty, delta: Int, cardId: String) {
         val changes = propertyChanges[property]
 
         if (changes == null) {
             propertyChanges[property] = mutableMapOf(cardId to delta)
         } else {
+            // notify that old change has expired
+            val oldDelta = changes[cardId]
+            if (oldDelta != null)
+                updates.offer(PlayerPropertyChange(name, property, -oldDelta))
             changes[cardId] = delta
         }
 
@@ -148,7 +171,7 @@ data class GameSession(
 
         // todo: change playerName to jwt validation
         if (playerName != player1.name && playerName != player2.name) {
-            println("No such player: $playerName")
+            logger.warn("No such player: $playerName")
             return
         }
 
@@ -213,9 +236,7 @@ data class GameSession(
                 it.ttl--
                 if (it.ttl <= 0) {
                     it.onExpire?.effect(it, currentPlayer, enemyPlayer)
-                    listOf(player1, player2).forEach { p ->
-                        p.propertyChanges.values.forEach { c -> c.remove(it.id) }
-                    }
+                    listOf(player1, player2).forEach { p -> p.removeTemporaryPropertyChange(it.id) }
                 }
                 it.ttl <= 0
             }

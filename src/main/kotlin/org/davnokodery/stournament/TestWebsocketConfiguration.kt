@@ -14,8 +14,8 @@ class TestWebsocketConfiguration: WebSocketMessageBrokerConfigurer {
 
     override fun configureMessageBroker(registry: MessageBrokerRegistry) {
         super.configureMessageBroker(registry)
-        registry.enableSimpleBroker("/topic")
-        registry.setApplicationDestinationPrefixes("/app")
+        registry.enableSimpleBroker("/topic")   // outgoing
+        registry.setApplicationDestinationPrefixes("/app")      // incoming
     }
 
     override fun registerStompEndpoints(registry: StompEndpointRegistry) {

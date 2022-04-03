@@ -13,10 +13,11 @@ internal class GameSessionTest {
     private lateinit var player2: SessionPlayer
     private lateinit var newGame: GameSession
 
-    private fun initPlayer(player: SessionPlayer, playerId: String) {
+    private fun addTestCards(player: SessionPlayer, playerId: String) {
         createHealingCard(playerId).let { player.cards[it.id] = it }
         createFireballCard(playerId).let { player.cards[it.id] = it }
         createIceShieldCard(playerId).let { player.cards[it.id] = it }
+        createFireShieldCard(playerId).let { player.cards[it.id] = it }
     }
 
     private fun createHealingCard(player: String) = Card(
@@ -58,6 +59,19 @@ internal class GameSessionTest {
             p.changePropertyTemporary(PlayerProperty.ColdResist, 15, "iceShield$player")
         })
 
+    /**
+     * Adds a deminishing fire resist for 2 turns: 1st turn +20%, 2nd +10%
+     */
+    private fun createFireShieldCard(player: String) = Card(
+        id = "fireShield$player",
+        name = "fireShield$player",
+        iconName = "fireShield$player",
+        description = "fireShield$player",
+        ttl = 3,
+        onTick = { c, p, _ ->
+            p.changePropertyTemporary(PlayerProperty.FireResist, c.ttl * 10, "fireShield$player")
+        })
+
     @BeforeEach
     fun setup() {
         player1 = createTestPlayer("1")
@@ -72,10 +86,11 @@ internal class GameSessionTest {
                     PlayerProperty.Health to 100,
                     PlayerProperty.MaxHealth to 100,
                     PlayerProperty.ColdResist to 0,
+                    PlayerProperty.FireResist to 0,
                 )
             )
         ).apply {
-            initPlayer(this, id)
+            addTestCards(this, id)
         }
 
     @AfterEach
@@ -227,5 +242,29 @@ internal class GameSessionTest {
         assertEquals(15, player1.getProperty(PlayerProperty.ColdResist))
         newGame.play(player1.name) //end turn 2
         assertEquals(0, player1.getProperty(PlayerProperty.ColdResist))
+    }
+
+    @Test
+    fun `play - play a card with temporary property change effect update each turn`() {
+        newGame.startGame()
+        newGame.status = GameSessionStatus.Player_1_Turn
+        newGame.play(player1.name, "fireShield1")
+        // no immediate change
+        assertEquals(0, player1.getProperty(PlayerProperty.FireResist))
+        newGame.play(player1.name) //end turn 1 for player 1
+        // effect is applied
+        assertEquals(30, player1.getProperty(PlayerProperty.FireResist))
+
+        newGame.play(player2.name) //end turn 1 for player 2
+
+        newGame.play(player1.name) //end turn 2 for player 1
+        // effect diminishes
+        assertEquals(20, player1.getProperty(PlayerProperty.FireResist))
+        newGame.play(player2.name) //end turn 2 for player 2
+
+        newGame.play(player1.name) //end turn 3 for player 1
+        // effect expired
+        assertEquals(0, player1.getProperty(PlayerProperty.FireResist))
+
     }
 }

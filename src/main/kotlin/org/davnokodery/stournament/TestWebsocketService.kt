@@ -20,7 +20,7 @@ class TestWebsocketService {
 
     @Scheduled(fixedRateString = "5000")
     fun testJob() {
-        println("run job")
+        println("run job: " + Date())
 
         sendTest()
     }
