@@ -16,3 +16,12 @@ class LoginController(@Autowired val authService: AuthService) {
     }
 
 }
+
+data class LoginRequest(
+    val name: String,
+    val password: String
+)
+
+data class LoginResponse(
+    val jwt: String
+)

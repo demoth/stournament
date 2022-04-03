@@ -1,5 +1,6 @@
 package org.davnokodery.rigel
 
+import org.davnokodery.rigel.model.*
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 
@@ -165,7 +166,7 @@ internal class GameSessionTest {
         newGame.updates.clear()
 
         newGame.play(wrongPlayer.name)
-        val gameUpdate = wrongPlayer.updates.poll() as? GameMessageUpdate
+        val gameUpdate = newGame.updates.poll() as? GameMessageUpdate
         assertEquals("It is $currentPlayerName's turn!", gameUpdate?.message)
     }
 
@@ -174,9 +175,9 @@ internal class GameSessionTest {
         newGame.startGame()
         val oldStatus = newGame.status
         val currentPlayer = if (oldStatus == GameSessionStatus.Player_1_Turn) player1 else player2
-        // skip turn
+        newGame.updates.clear()
         newGame.play(currentPlayer.name, "whatever")
-        val gameUpdate = currentPlayer.updates.poll() as? GameMessageUpdate
+        val gameUpdate = newGame.updates.poll() as? GameMessageUpdate
         assertEquals("Error! No such card!", gameUpdate?.message)
     }
 
@@ -186,8 +187,9 @@ internal class GameSessionTest {
         val oldStatus = newGame.status
         val currentPlayer = if (oldStatus == GameSessionStatus.Player_1_Turn) player1 else player2
         // skip turn
+        newGame.updates.clear()
         newGame.play(currentPlayer.name, currentPlayer.cards.values.first().id, "wherever")
-        val gameUpdate = currentPlayer.updates.poll() as? GameMessageUpdate
+        val gameUpdate = newGame.updates.poll() as? GameMessageUpdate
         assertEquals("Target not found!", gameUpdate?.message)
     }
 
@@ -196,8 +198,9 @@ internal class GameSessionTest {
         newGame.startGame()
         newGame.status = GameSessionStatus.Player_1_Turn
         // skip turn
+        newGame.updates.clear()
         newGame.play(player1.name, "healing1")
-        val playerUpdate = player1.updates.poll() as? GameMessageUpdate
+        val playerUpdate = newGame.updates.poll() as? GameMessageUpdate
         assertEquals("Health is already full", playerUpdate?.message)
     }
 

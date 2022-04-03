@@ -66,3 +66,64 @@ updates:
  * random property change
 
  * getHealth() = base_health * getIncreased(1 + 0.01 + 0.02 + (-0.01)) + getFlat_health()
+
+
+    //
+    //val fireballEffect = CardAction { card, owner, enemy, targetEffect ->
+    //    enemy.changeProperty(PlayerProperty.Health, -5) // todo: damage calculation, // add delta instead of direct manipulation // add card id
+    //    enemy.getProperty(PlayerProperty.Health)
+    //}
+    ///*
+    //on expire -> enemy.expirePropertyChange(card.id)
+    // */
+    //
+    //Player {
+    //    fun applyDamage(amount: Int) {
+    //        // apply damage?
+    //        listeners.forEach {it.notify(damage.amount)}
+    //
+    //    }
+    //}
+    //
+    //val coldShieldEffect = CardAction { card, owner, enemy, targetEffect ->
+    //    owner.changeTemporaryProperty(PlayerProperty.ColdResist, +15, ttl: 3)
+    //    owner.applyEffect(card)
+    //    owner.addListener(
+    //        //broadcastDamage()
+    //    )
+    //}
+    //
+    //Card {
+    //    name = "leech",
+    //    playEffect = ...,
+    //
+    //}
+    //
+    //val leechEffect = CardAction { card, owner, enemy, targetEffect ->
+    //    enemy.addPropertyListener(
+    //        PlayerProperty.Health,
+    //        health, delta ->
+    //            if (delta > 0) {
+    //                owner.permanentlyChangeProperty(PlayerProperty.Health, delta / 2, card.id)
+    //            }
+    //
+    //    )
+    //    owner.changeTemporaryProperty(PlayerProperty.ColdResist, +15, ttl: 3)
+    //    owner.applyEffect(card)
+    //    owner.addListener(
+    //        //broadcastDamage()
+    //    )
+    //}
+    //fun getSeed(): Long {
+    ////    if (mode == Test){
+    ////        return 42
+    ////    }
+    //    return Random().nextLong()
+    //}
+    //
+    //fun myRandom() = Random(getSeed())
+    //
+    //val lightningStrike = CardAction { card, owner, enemy, targetEffect ->
+    //    enemy.changeProperty(PlayerProperty.Health, myRandom().nextInt(-10, -1))
+    //}
+    //
