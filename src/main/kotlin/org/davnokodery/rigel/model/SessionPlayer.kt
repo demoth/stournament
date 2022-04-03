@@ -1,9 +1,8 @@
 package org.davnokodery.rigel.model
 
-import org.davnokodery.rigel.GameUpdate
+import org.davnokodery.rigel.MessageSender
 import org.davnokodery.rigel.PlayerPropertyChange
 import java.util.*
-import java.util.concurrent.ConcurrentLinkedQueue
 
 enum class PlayerProperty {
     Health,
@@ -13,12 +12,13 @@ enum class PlayerProperty {
 }
 
 data class SessionPlayer(
+    val sessionId: String,
     val name: String,
+    val sender: MessageSender,
     private val properties: EnumMap<PlayerProperty, Int> = EnumMap(PlayerProperty::class.java),
     private val propertyChanges: EnumMap<PlayerProperty, MutableMap<CardId, Int>> = EnumMap(PlayerProperty::class.java),
     val cards: MutableMap<String, Card> = hashMapOf(), // todo make it private
-    val effects: MutableMap<String, Card> = hashMapOf(),
-    val updates: Queue<GameUpdate> = ConcurrentLinkedQueue(), // player specific updates
+    val effects: MutableMap<String, Card> = hashMapOf()
 ) {
 
     fun getProperty(property: PlayerProperty): Int {
@@ -29,14 +29,14 @@ data class SessionPlayer(
         val oldValue = properties[property]!!
         properties[property] = oldValue + delta
         // todo need to calculate new values for health or mana and broadcast them
-        updates.offer(PlayerPropertyChange(name, property, delta))
+        sender.send(PlayerPropertyChange(sessionId, property, delta))
     }
 
     fun removeTemporaryPropertyChange(id: CardId) {
         propertyChanges.forEach { (property, changes) ->
             val oldDelta = changes.remove(id)
             if (oldDelta != null) {
-                updates.offer(PlayerPropertyChange(name, property, -oldDelta))
+                sender.send(PlayerPropertyChange(sessionId, property, -oldDelta))
             }
         }
     }
@@ -50,11 +50,11 @@ data class SessionPlayer(
             // notify that old change has expired
             val oldDelta = changes[cardId]
             if (oldDelta != null)
-                updates.offer(PlayerPropertyChange(name, property, -oldDelta))
+                sender.send(PlayerPropertyChange(sessionId, property, -oldDelta))
             changes[cardId] = delta
         }
 
         // todo need to calculate new values for health or mana and broadcast them
-        updates.offer(PlayerPropertyChange(name, property, delta))
+        sender.send(PlayerPropertyChange(sessionId, property, delta))
     }
 }

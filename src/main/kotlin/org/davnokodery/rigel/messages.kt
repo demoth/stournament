@@ -19,9 +19,8 @@ data class GameStatusUpdate(val newStatus: GameSessionStatus) : GameUpdate()
 data class CardPlayed(val cardId: String, val discarded: Boolean) : GameUpdate()
 
 // targeted
-data class GameMessageUpdate(val message: String, val playerName: String? = null) : GameUpdate()
-data class PlayerPropertyChange(val playerName: String, val property: PlayerProperty, val delta: Int) :
-    GameUpdate(playerName)
+data class GameMessageUpdate(val message: String, val playerSessionId: String? = null) : GameUpdate()
+data class PlayerPropertyChange(val playerSessionId: String, val property: PlayerProperty, val delta: Int) : GameUpdate()
 
 
 ///////////////////////
@@ -44,3 +43,4 @@ data class JwtMessage(val jwt: String) : RigelWsMessage()
 class CreateGameMessage : RigelWsMessage()
 class JoinGameMessage(val gameId: String): RigelWsMessage()
 class StartGameMessage: RigelWsMessage()
+class PlayCardMessage(val cardId: String, val targetId: String): RigelWsMessage()

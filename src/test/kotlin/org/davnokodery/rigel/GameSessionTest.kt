@@ -13,6 +13,8 @@ internal class GameSessionTest {
     private lateinit var player1: SessionPlayer
     private lateinit var player2: SessionPlayer
     private lateinit var newGame: GameSession
+    private val messages = mutableListOf<GameUpdate>()
+    private val sender = MessageSender { messages.add(it) }
 
     private fun addTestCards(player: SessionPlayer, playerId: String) {
         createHealingCard(playerId).let { player.cards[it.id] = it }
@@ -61,7 +63,7 @@ internal class GameSessionTest {
         })
 
     /**
-     * Adds a deminishing fire resist for 2 turns: 1st turn +20%, 2nd +10%
+     * Adds a diminishing fire resist for 2 turns: 1st turn +20%, 2nd +10%
      */
     private fun createFireShieldCard(player: String) = Card(
         id = "fireShield$player",
@@ -77,12 +79,14 @@ internal class GameSessionTest {
     fun setup() {
         player1 = createTestPlayer("1")
         player2 = createTestPlayer("2")
-        newGame = GameSession(player1, player2)
+        newGame = GameSession("id", player1, sender)
+        newGame.player2 = player2
+        messages.clear()
     }
 
     private fun createTestPlayer(id: String) =
         SessionPlayer(
-            name = "player$id", properties = EnumMap(
+            sessionId = "player$id", name = "$id name", sender = sender, properties = EnumMap(
                 mapOf(
                     PlayerProperty.Health to 100,
                     PlayerProperty.MaxHealth to 100,
@@ -96,13 +100,7 @@ internal class GameSessionTest {
 
     @AfterEach
     fun printUpdates() {
-        newGame.updates.forEach {
-            println(it)
-        }
-        player1.updates.forEach {
-            println(it)
-        }
-        player2.updates.forEach {
+        messages.forEach {
             println(it)
         }
     }
@@ -115,21 +113,21 @@ internal class GameSessionTest {
 
         val newStatus = newGame.status
         assertTrue(newStatus == GameSessionStatus.Player_1_Turn || newStatus == GameSessionStatus.Player_2_Turn)
-        val gameUpdate = newGame.updates.poll() as? GameStatusUpdate
+        val gameUpdate = messages.last() as? GameStatusUpdate
         assertEquals(newStatus, gameUpdate?.newStatus)
     }
 
     @Test
     fun `play - validate no such player`() {
         newGame.play("who am i?")
-        assertTrue(newGame.updates.isEmpty())
+        assertTrue(messages.isEmpty())
     }
 
     @Test
     fun `play - game is not started`() {
-        val currentPlayerName = if (newGame.status == GameSessionStatus.Player_1_Turn) player1.name else player2.name
-        newGame.play(currentPlayerName)
-        val gameUpdate = newGame.updates.poll() as? GameMessageUpdate
+        val currentPlayerId = if (newGame.status == GameSessionStatus.Player_1_Turn) player1.sessionId else player2.sessionId
+        newGame.play(currentPlayerId)
+        val gameUpdate = messages.last() as? GameMessageUpdate
         assertEquals("Game is not started yet", gameUpdate?.message)
 
     }
@@ -138,9 +136,9 @@ internal class GameSessionTest {
     fun `play - end turn`() {
         newGame.startGame()
         val oldStatus = newGame.status
-        val currentPlayerName = if (oldStatus == GameSessionStatus.Player_1_Turn) player1.name else player2.name
+        val currentPlayerId = if (oldStatus == GameSessionStatus.Player_1_Turn) player1.sessionId else player2.sessionId
         // end turn
-        newGame.play(currentPlayerName)
+        newGame.play(currentPlayerId)
         assertNotEquals(oldStatus, newGame.status)
     }
 
@@ -148,12 +146,12 @@ internal class GameSessionTest {
     fun `play - game is finished`() {
         newGame.startGame()
         val oldStatus = newGame.status
-        val currentPlayerName = if (oldStatus == GameSessionStatus.Player_1_Turn) player1.name else player2.name
+        val currentPlayerId = if (oldStatus == GameSessionStatus.Player_1_Turn) player1.sessionId else player2.sessionId
         newGame.status = GameSessionStatus.Player_2_Won
-        newGame.updates.clear()
+        messages.clear()
 
-        newGame.play(currentPlayerName)
-        val gameUpdate = newGame.updates.poll() as? GameMessageUpdate
+        newGame.play(currentPlayerId)
+        val gameUpdate = messages.last() as? GameMessageUpdate
         assertEquals("Game is finished, start a new game", gameUpdate?.message)
     }
 
@@ -161,13 +159,13 @@ internal class GameSessionTest {
     fun `play - not in turn`() {
         newGame.startGame()
         val oldStatus = newGame.status
-        val currentPlayerName = if (oldStatus == GameSessionStatus.Player_1_Turn) player1.name else player2.name
+        val currentPlayer = if (oldStatus == GameSessionStatus.Player_1_Turn) player1 else player2
         val wrongPlayer = if (oldStatus != GameSessionStatus.Player_1_Turn) player1 else player2
-        newGame.updates.clear()
+        messages.clear()
 
-        newGame.play(wrongPlayer.name)
-        val gameUpdate = newGame.updates.poll() as? GameMessageUpdate
-        assertEquals("It is $currentPlayerName's turn!", gameUpdate?.message)
+        newGame.play(wrongPlayer.sessionId)
+        val gameUpdate = messages.last() as? GameMessageUpdate
+        assertEquals("It is ${currentPlayer.name}'s turn!", gameUpdate?.message)
     }
 
     @Test
@@ -175,9 +173,9 @@ internal class GameSessionTest {
         newGame.startGame()
         val oldStatus = newGame.status
         val currentPlayer = if (oldStatus == GameSessionStatus.Player_1_Turn) player1 else player2
-        newGame.updates.clear()
-        newGame.play(currentPlayer.name, "whatever")
-        val gameUpdate = newGame.updates.poll() as? GameMessageUpdate
+        messages.clear()
+        newGame.play(currentPlayer.sessionId, "whatever")
+        val gameUpdate = messages.last() as? GameMessageUpdate
         assertEquals("Error! No such card!", gameUpdate?.message)
     }
 
@@ -187,9 +185,9 @@ internal class GameSessionTest {
         val oldStatus = newGame.status
         val currentPlayer = if (oldStatus == GameSessionStatus.Player_1_Turn) player1 else player2
         // skip turn
-        newGame.updates.clear()
-        newGame.play(currentPlayer.name, currentPlayer.cards.values.first().id, "wherever")
-        val gameUpdate = newGame.updates.poll() as? GameMessageUpdate
+        messages.clear()
+        newGame.play(currentPlayer.sessionId, currentPlayer.cards.values.first().id, "wherever")
+        val gameUpdate = messages.last() as? GameMessageUpdate
         assertEquals("Target not found!", gameUpdate?.message)
     }
 
@@ -198,9 +196,9 @@ internal class GameSessionTest {
         newGame.startGame()
         newGame.status = GameSessionStatus.Player_1_Turn
         // skip turn
-        newGame.updates.clear()
-        newGame.play(player1.name, "healing1")
-        val playerUpdate = newGame.updates.poll() as? GameMessageUpdate
+        messages.clear()
+        newGame.play(player1.sessionId, "healing1")
+        val playerUpdate = messages.last() as? GameMessageUpdate
         assertEquals("Health is already full", playerUpdate?.message)
     }
 
@@ -208,11 +206,10 @@ internal class GameSessionTest {
     fun `play - play a spell card`() {
         newGame.startGame()
         newGame.status = GameSessionStatus.Player_2_Turn
-        newGame.updates.clear()
-        newGame.play(player2.name, "fireball2")
-        assertTrue(player2.updates.isEmpty(), "Unexpected updates: ${player2.updates}")
+        messages.clear()
+        newGame.play(player2.sessionId, "fireball2")
         assertEquals(95, player1.getProperty(PlayerProperty.Health))
-        val cardPlayed = newGame.updates.poll() as? CardPlayed
+        val cardPlayed = messages.last() as? CardPlayed
         assertEquals("fireball2", cardPlayed?.cardId)
         assertEquals(true, cardPlayed?.discarded)
     }
@@ -222,14 +219,14 @@ internal class GameSessionTest {
         newGame.startGame()
         newGame.status = GameSessionStatus.Player_1_Turn
         player1.changeProperty(PlayerProperty.Health, -50)
-        newGame.play(player1.name, "healing1")
-        newGame.play(player1.name) //end turn
-        newGame.play(player2.name) //end turn
-        newGame.play(player1.name) //end turn
+        newGame.play(player1.sessionId, "healing1")
+        newGame.play(player1.sessionId) //end turn
+        newGame.play(player2.sessionId) //end turn
+        newGame.play(player1.sessionId) //end turn
 
         assertEquals(52, player1.getProperty(PlayerProperty.Health))
         assertNotNull(
-            newGame.updates.find { it is CardPlayed && it.cardId == "healing1" && it.discarded },
+            messages.find { it is CardPlayed && it.cardId == "healing1" && it.discarded },
             "Card did not expire"
         )
     }
@@ -238,12 +235,12 @@ internal class GameSessionTest {
     fun `play - play a card with temporary property change effect`() {
         newGame.startGame()
         newGame.status = GameSessionStatus.Player_1_Turn
-        newGame.play(player1.name, "iceShield1")
+        newGame.play(player1.sessionId, "iceShield1")
         assertEquals(15, player1.getProperty(PlayerProperty.ColdResist))
-        newGame.play(player1.name) //end turn 1
-        newGame.play(player2.name) //end turn 1
+        newGame.play(player1.sessionId) //end turn 1
+        newGame.play(player2.sessionId) //end turn 1
         assertEquals(15, player1.getProperty(PlayerProperty.ColdResist))
-        newGame.play(player1.name) //end turn 2
+        newGame.play(player1.sessionId) //end turn 2
         assertEquals(0, player1.getProperty(PlayerProperty.ColdResist))
     }
 
@@ -251,21 +248,21 @@ internal class GameSessionTest {
     fun `play - play a card with temporary property change effect update each turn`() {
         newGame.startGame()
         newGame.status = GameSessionStatus.Player_1_Turn
-        newGame.play(player1.name, "fireShield1")
+        newGame.play(player1.sessionId, "fireShield1")
         // no immediate change
         assertEquals(0, player1.getProperty(PlayerProperty.FireResist))
-        newGame.play(player1.name) //end turn 1 for player 1
+        newGame.play(player1.sessionId) //end turn 1 for player 1
         // effect is applied
         assertEquals(30, player1.getProperty(PlayerProperty.FireResist))
 
-        newGame.play(player2.name) //end turn 1 for player 2
+        newGame.play(player2.sessionId) //end turn 1 for player 2
 
-        newGame.play(player1.name) //end turn 2 for player 1
+        newGame.play(player1.sessionId) //end turn 2 for player 1
         // effect diminishes
         assertEquals(20, player1.getProperty(PlayerProperty.FireResist))
-        newGame.play(player2.name) //end turn 2 for player 2
+        newGame.play(player2.sessionId) //end turn 2 for player 2
 
-        newGame.play(player1.name) //end turn 3 for player 1
+        newGame.play(player1.sessionId) //end turn 3 for player 1
         // effect expired
         assertEquals(0, player1.getProperty(PlayerProperty.FireResist))
 

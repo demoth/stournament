@@ -3,7 +3,6 @@ package org.davnokodery.rigel.model
 import org.davnokodery.rigel.*
 import org.slf4j.LoggerFactory
 import java.util.*
-import java.util.concurrent.ConcurrentLinkedQueue
 
 enum class GameSessionStatus {
     Created,
@@ -14,16 +13,17 @@ enum class GameSessionStatus {
 }
 
 data class GameSession(
-    private val player1: SessionPlayer,
-    private var player2: SessionPlayer,
-    internal val updates: Queue<GameUpdate> = ConcurrentLinkedQueue(), // common updates
+    val id: String,
+    val player1: SessionPlayer,
+    internal val sender: MessageSender,
     internal var status: GameSessionStatus = GameSessionStatus.Created,
-    val id: String = UUID.randomUUID().toString(),
 ) {
     private val logger = LoggerFactory.getLogger(GameSession::class.java)
 
+    lateinit var player2: SessionPlayer //fixme: THIS IS DANGEROUS
+
     private fun send(update: GameUpdate) {
-        updates.offer(update)
+        sender.send(update)
     }
 
     private fun changeStatus(newState: GameSessionStatus) {
@@ -42,17 +42,16 @@ data class GameSession(
     // todo end turn move to another function
     /**
      * Run the game logic of the user playing a card.
-     * @param playerName - current player name, todo: switch to jwt,
+     * @param playerSessionId - current player session id,
      * @param cardId - either id of the card in the hand or the effect card id, when null - end turn,
      * @param target - id of the card to apply effect to (if applicable)
      */
-    fun play(playerName: String, cardId: String? = null, target: String? = null) {
+    fun play(playerSessionId: String, cardId: String? = null, target: String? = null) {
 
         // Validations
 
-        // todo: change playerName to jwt validation
-        if (playerName != player1.name && playerName != player2.name) {
-            logger.warn("No such player: $playerName")
+        if (playerSessionId != player1.sessionId && playerSessionId != player2.sessionId) {
+            logger.warn("No such player: $playerSessionId")
             return
         }
 
@@ -69,8 +68,8 @@ data class GameSession(
         val currentPlayer = if (status == GameSessionStatus.Player_1_Turn) player1 else player2
         val enemyPlayer = if (status == GameSessionStatus.Player_2_Turn) player1 else player2
 
-        if (playerName != currentPlayer.name) {
-            send(GameMessageUpdate("It is ${currentPlayer.name}'s turn!", playerName))
+        if (playerSessionId != currentPlayer.sessionId) {
+            send(GameMessageUpdate("It is ${currentPlayer.name}'s turn!", playerSessionId))
             return
         }
 
@@ -79,20 +78,20 @@ data class GameSession(
             // selected card or effect exists
             val card = currentPlayer.cards[cardId] ?: currentPlayer.effects[cardId]
             if (card == null) {
-                send(GameMessageUpdate("Error! No such card!", currentPlayer.name))
+                send(GameMessageUpdate("Error! No such card!", currentPlayer.sessionId))
                 return
             }
 
             val targetEffect = currentPlayer.effects[target] ?: enemyPlayer.effects[target]
 
             if (target != null && targetEffect == null) {
-                send(GameMessageUpdate("Target not found!", currentPlayer.name))
+                send(GameMessageUpdate("Target not found!", currentPlayer.sessionId))
                 return
             }
 
             val cardError = card.validator?.validate(card, currentPlayer, enemyPlayer, targetEffect)
             if (cardError != null) {
-                send(GameMessageUpdate(cardError, currentPlayer.name))
+                send(GameMessageUpdate(cardError, currentPlayer.sessionId))
                 return
             }
 
