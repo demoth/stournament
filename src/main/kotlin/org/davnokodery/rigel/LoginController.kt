@@ -14,7 +14,6 @@ class LoginController(@Autowired val authService: AuthService) {
     fun login(@RequestBody login: LoginRequest): LoginResponse {
         return authService.loginUser(login.name, login.password)
     }
-
 }
 
 data class LoginRequest(

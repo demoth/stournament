@@ -56,7 +56,7 @@ class UserSessionManager(
         val request: RigelWsMessage = try {
             mapper.readValue(message.payload)
         } catch (e: Exception) {
-            logger.error("Could not parse message from session=${session.id}, message='${message.payload}'")
+            logger.error("Could not parse message from session=${session.id}, message='${message.payload}'", e)
             session.close()
             return
         }
@@ -104,6 +104,8 @@ class UserSessionManager(
                     }
                 )
                 games[gameId] = newGameSession
+                logger.debug("Created new game $gameId")
+
             }
             is StartGameMessage -> {
                 val gameSession = games.values.firstOrNull {
@@ -114,6 +116,8 @@ class UserSessionManager(
                     return
                 }
                 gameSession.startGame()
+                logger.debug("Game started ${gameSession.id}")
+
             }
             is JoinGameMessage -> {
                 val gameSession = games[request.gameId]
@@ -129,6 +133,7 @@ class UserSessionManager(
                         userSession.session.sendMessage(TextMessage(mapper.writeValueAsString(it)))
                     }
                 )
+                logger.debug("Joined player: ${userSession.user!!.name}, game id: ${gameSession.id}")
             }
             is PlayCardMessage -> {
                 val gameSession = games.values.firstOrNull {
@@ -139,6 +144,7 @@ class UserSessionManager(
                     return
                 }
                 gameSession.play(session.id, request.cardId, request.targetId)
+                logger.debug("Played card: ${request.cardId}, target: ${request.targetId}, user: ${userSession.user!!.name}")
             }
         }
     }

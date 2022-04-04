@@ -31,9 +31,14 @@ data class PlayerPropertyChange(val playerSessionId: String, val property: Playe
     include = JsonTypeInfo.As.PROPERTY,
     property = "_type"
 )
+
 @JsonSubTypes(
     JsonSubTypes.Type(value = JwtMessage::class, name = "jwt"),
-    JsonSubTypes.Type(value = CreateGameMessage::class, name = "newgame")
+    JsonSubTypes.Type(value = CreateGameMessage::class, name = "newgame"),
+    JsonSubTypes.Type(value = JoinGameMessage::class, name = "joingame"),
+    JsonSubTypes.Type(value = StartGameMessage::class, name = "startgame"),
+    JsonSubTypes.Type(value = PlayCardMessage::class, name = "playcard"),
+    JsonSubTypes.Type(value = SkipTurnMessage::class, name = "skipturn")
 )
 abstract class RigelWsMessage {
 }
@@ -44,3 +49,4 @@ class CreateGameMessage : RigelWsMessage()
 class JoinGameMessage(val gameId: String): RigelWsMessage()
 class StartGameMessage: RigelWsMessage()
 class PlayCardMessage(val cardId: String, val targetId: String): RigelWsMessage()
+class SkipTurnMessage: RigelWsMessage()
