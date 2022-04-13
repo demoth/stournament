@@ -11,5 +11,6 @@ pluginManagement {
         kotlin("plugin.jpa") version kotlinVersion
     }
 }
+include(":app")
 rootProject.name = "stournament"
 
