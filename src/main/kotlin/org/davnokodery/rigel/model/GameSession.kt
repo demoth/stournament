@@ -22,7 +22,7 @@ data class GameSession(
 
     lateinit var player2: SessionPlayer //fixme: THIS IS DANGEROUS
 
-    private fun send(update: GameUpdate) {
+    private fun send(update: ServerWsMessage) {
         sender.send(update)
     }
 

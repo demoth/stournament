@@ -11,7 +11,7 @@ import org.springframework.web.socket.CloseStatus
 import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketSession
 import org.springframework.web.socket.handler.TextWebSocketHandler
-import java.util.UUID
+import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
 data class UserSession(
@@ -20,7 +20,7 @@ data class UserSession(
 )
 
 fun interface MessageSender {
-    fun send(message: GameUpdate)
+    fun send(message: ServerWsMessage)
 }
 
 @Component
@@ -42,6 +42,7 @@ class UserSessionManager(
     override fun afterConnectionClosed(session: WebSocketSession, status: CloseStatus) {
         logger.info("Disconnected ${sessions[session.id]?.user?.name} (${session.id})")
         sessions.remove(session.id)
+        // todo: leave and stop running games related to this user
     }
 
     override fun handleTextMessage(session: WebSocketSession, message: TextMessage) {
@@ -53,7 +54,7 @@ class UserSessionManager(
             return
         }
 
-        val request: RigelWsMessage = try {
+        val request: ClientWsMessage = try {
             mapper.readValue(message.payload)
         } catch (e: Exception) {
             logger.error("Could not parse message from session=${session.id}, message='${message.payload}'", e)
@@ -61,24 +62,22 @@ class UserSessionManager(
             return
         }
 
-        // check user authentication
-        if (userSession.user == null) {
-            if (request is JwtMessage) {
-                try {
-                    userSession.user = authService.validateToken(request.jwt)
-                } catch (e: Exception) {
-                    logger.error("Could not prove login: ", e)
-                    session.close()
-                    return
-                }
-            } else {
-                logger.error("First message is not jwt for session: ${session.id}")
-                session.close()
-                return
-            }
-        }
-
         when (request) {
+            is JwtMessage -> {
+                // check user authentication
+                if (userSession.user == null) {
+                        try {
+                            userSession.user = authService.validateToken(request.jwt)
+                        } catch (e: Exception) {
+                            logger.error("Could not prove login: ", e)
+                            session.close()
+                            return
+                        }
+                } else {
+                    logger.warn("Unexpected JwtMessage for user: ${session.id}, disconnecting")
+                    session.close()
+                }
+            }
             is CreateGameMessage -> {
                 // todo: check that there is no running game
                 // create new game
@@ -89,22 +88,34 @@ class UserSessionManager(
                         sessionId = session.id,
                         name = userSession.user!!.name,
                         sender = {
-                            userSession.session.sendMessage(TextMessage(mapper.writeValueAsString(it)))
+                            userSession.session.sendMessage(toJson(it))
                     }),
                     sender = {
                         val gameSession = games[gameId]!!
-                        if (it is GameStatusUpdate || it is CardPlayed || (it is GameMessageUpdate && it.playerSessionId == null)) {
-                            sessions[gameSession.player1.sessionId]?.session?.sendMessage(TextMessage(mapper.writeValueAsString(it)))
-                            sessions[gameSession.player2.sessionId]?.session?.sendMessage(TextMessage(mapper.writeValueAsString(it)))
-                        } else if (it is PlayerPropertyChange) {
-                            sessions[it.playerSessionId]?.session?.sendMessage(TextMessage(mapper.writeValueAsString(it)))
-                        } else if (it is GameMessageUpdate && it.playerSessionId != null) {
-                            sessions[it.playerSessionId]?.session?.sendMessage(TextMessage(mapper.writeValueAsString(it)))
+                        // broadcast message
+                        when {
+                            it is GameStatusUpdate
+                                    || it is CardPlayed
+                                    || it is GameMessageUpdate && it.playerSessionId == null -> {
+                                sessions[gameSession.player1.sessionId]?.session?.sendMessage(toJson(it))
+                                sessions[gameSession.player2.sessionId]?.session?.sendMessage(toJson(it))
+                            }
+                            it is PlayerPropertyChange -> {
+                                // unicast message
+                                sessions[it.playerSessionId]?.session?.sendMessage(toJson(it))
+                            }
+                            it is GameMessageUpdate && it.playerSessionId != null -> {
+                                // unicast message
+                                sessions[it.playerSessionId]?.session?.sendMessage(toJson(it))
+                            }
                         }
                     }
                 )
                 games[gameId] = newGameSession
                 logger.debug("Created new game $gameId")
+                sessions.values.forEach {
+                    it.session.sendMessage(toJson(NewGameCreated(gameId)))
+                }
 
             }
             is StartGameMessage -> {
@@ -125,7 +136,7 @@ class UserSessionManager(
                     logger.warn("No such game") // todo: send error response
                     return
                 }
-                // todo: check if noone else has joined
+                // todo: check if no one else has joined
                 gameSession.player2 = SessionPlayer(
                     sessionId = session.id,
                     name = userSession.user!!.name,
@@ -146,6 +157,12 @@ class UserSessionManager(
                 gameSession.play(session.id, request.cardId, request.targetId)
                 logger.debug("Played card: ${request.cardId}, target: ${request.targetId}, user: ${userSession.user!!.name}")
             }
+            is GameListRequest -> {
+                userSession.session.sendMessage(toJson(GamesListResponse(games.keys.toList())))
+            }
+            is SkipTurnMessage -> TODO()
         }
     }
+
+    private fun toJson(it: ServerWsMessage) = TextMessage(mapper.writeValueAsString(it))
 }

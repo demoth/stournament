@@ -2,10 +2,9 @@ package org.davnokodery.rigel
 
 import org.davnokodery.rigel.model.*
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Test
-
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 import java.util.*
 
 internal class GameSessionTest {
@@ -13,7 +12,7 @@ internal class GameSessionTest {
     private lateinit var player1: SessionPlayer
     private lateinit var player2: SessionPlayer
     private lateinit var newGame: GameSession
-    private val messages = mutableListOf<GameUpdate>()
+    private val messages = mutableListOf<ServerWsMessage>()
     private val sender = MessageSender { messages.add(it) }
 
     private fun addTestCards(player: SessionPlayer, playerId: String) {
