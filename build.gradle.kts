@@ -30,6 +30,7 @@ dependencies {
 
 	runtimeOnly("com.h2database:h2")
 
+	testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm")
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
 

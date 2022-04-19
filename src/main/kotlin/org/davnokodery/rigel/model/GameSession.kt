@@ -20,7 +20,7 @@ data class GameSession(
 ) {
     private val logger = LoggerFactory.getLogger(GameSession::class.java)
 
-    lateinit var player2: SessionPlayer //fixme: THIS IS DANGEROUS
+    var player2: SessionPlayer? = null
 
     private fun send(update: ServerWsMessage) {
         sender.send(update)
@@ -47,14 +47,6 @@ data class GameSession(
      * @param target - id of the card to apply effect to (if applicable)
      */
     fun play(playerSessionId: String, cardId: String? = null, target: String? = null) {
-
-        // Validations
-
-        if (playerSessionId != player1.sessionId && playerSessionId != player2.sessionId) {
-            logger.warn("No such player: $playerSessionId")
-            return
-        }
-
         if (status == GameSessionStatus.Created) {
             send(GameMessageUpdate("Game is not started yet"))
             return
@@ -65,8 +57,18 @@ data class GameSession(
             return
         }
 
-        val currentPlayer = if (status == GameSessionStatus.Player_1_Turn) player1 else player2
-        val enemyPlayer = if (status == GameSessionStatus.Player_2_Turn) player1 else player2
+        // Validations
+        val secondPlayer = player2
+        check(secondPlayer != null) { "Player 2 is not initialized (Game was not started?)" }
+
+        if (playerSessionId != player1.sessionId && playerSessionId != secondPlayer.sessionId) {
+            logger.warn("No such player: $playerSessionId")
+            return
+        }
+
+
+        val currentPlayer = if (status == GameSessionStatus.Player_1_Turn) player1 else secondPlayer
+        val enemyPlayer = if (status == GameSessionStatus.Player_2_Turn) player1 else secondPlayer
 
         if (playerSessionId != currentPlayer.sessionId) {
             send(GameMessageUpdate("It is ${currentPlayer.name}'s turn!", playerSessionId))
@@ -113,7 +115,7 @@ data class GameSession(
                 it.ttl--
                 if (it.ttl <= 0) {
                     it.onExpire?.effect(it, currentPlayer, enemyPlayer)
-                    listOf(player1, player2).forEach { p -> p.removeTemporaryPropertyChange(it.id) }
+                    listOf(player1, secondPlayer).forEach { p -> p.removeTemporaryPropertyChange(it.id) }
                 }
                 it.ttl <= 0
             }

@@ -118,8 +118,9 @@ internal class GameSessionTest {
 
     @Test
     fun `play - validate no such player`() {
+        newGame.startGame()
         newGame.play("who am i?")
-        assertTrue(messages.isEmpty())
+        assertNull(messages.find { it is GameMessageUpdate })
     }
 
     @Test

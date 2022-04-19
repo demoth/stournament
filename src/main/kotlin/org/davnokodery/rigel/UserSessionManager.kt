@@ -98,7 +98,7 @@ class UserSessionManager(
                                     || it is CardPlayed
                                     || it is GameMessageUpdate && it.playerSessionId == null -> {
                                 sessions[gameSession.player1.sessionId]?.session?.sendMessage(toJson(it))
-                                sessions[gameSession.player2.sessionId]?.session?.sendMessage(toJson(it))
+                                sessions[gameSession.player2!!.sessionId]?.session?.sendMessage(toJson(it))
                             }
                             it is PlayerPropertyChange -> {
                                 // unicast message
@@ -119,15 +119,17 @@ class UserSessionManager(
 
             }
             is StartGameMessage -> {
-                val gameSession = games.values.firstOrNull {
-                    it.player1.sessionId == session.id || it.player2.sessionId == session.id
-                }
+                val gameSession = findGameByPlayerId(session.id)
                 if (gameSession == null) {
                     logger.warn("No such game") // todo: send error response
                     return
                 }
-                gameSession.startGame()
-                logger.debug("Game started ${gameSession.id}")
+                if (gameSession.player2 != null) {
+                    gameSession.startGame()
+                    logger.debug("Game started ${gameSession.id}")
+                } else {
+                    session.sendMessage(toJson(GameMessageUpdate("Not enough players")))
+                }
 
             }
             is JoinGameMessage -> {
@@ -147,9 +149,7 @@ class UserSessionManager(
                 logger.debug("Joined player: ${userSession.user!!.name}, game id: ${gameSession.id}")
             }
             is PlayCardMessage -> {
-                val gameSession = games.values.firstOrNull {
-                    it.player1.sessionId == session.id || it.player2.sessionId == session.id
-                }
+                val gameSession = findGameByPlayerId(session.id)
                 if (gameSession == null) {
                     logger.warn("No such game") // todo: send error response
                     return
@@ -162,6 +162,10 @@ class UserSessionManager(
             }
             is SkipTurnMessage -> TODO()
         }
+    }
+
+    private fun findGameByPlayerId(sessionId: String) = games.values.firstOrNull {
+        sessionId == it.player1.sessionId || sessionId == it.player2?.sessionId
     }
 
     private fun toJson(it: ServerWsMessage) = TextMessage(mapper.writeValueAsString(it))
