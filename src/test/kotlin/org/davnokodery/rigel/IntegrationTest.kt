@@ -6,7 +6,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.davnokodery.rigel.TestDataCreator.Companion.testUser1
 import org.davnokodery.rigel.model.GameSessionStatus
+import org.davnokodery.rigel.model.GameSessionStatus.Player_1_Turn
+import org.davnokodery.rigel.model.GameSessionStatus.Player_2_Turn
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
 import org.springframework.boot.test.context.SpringBootTest
@@ -37,6 +40,21 @@ class IntegrationTest {
         assertEquals("Not enough players", testClient.messages.firstOrNull()?.message)
     }
 
+    @Test
+    fun `start game - positive`() = runBlocking {
+        val tester1 = TestClient(loginPost(testUser1))
+        tester1.login()
+
+        val tester2 = TestClient(loginPost(testUser1))
+        tester2.login()
+
+        tester1.createGame()
+        tester2.joinGame()
+        tester1.startGame()
+        assertEquals(tester1.gameStatus, tester2.gameStatus)
+        assertTrue(tester1.gameStatus == Player_1_Turn || tester1.gameStatus == Player_2_Turn)
+    }
+
     private val url
         get() = "localhost:$port"
 
@@ -54,10 +72,9 @@ class IntegrationTest {
     inner class TestClient(private val jwt: String) : WebSocketHandler {
         private val mapper = jacksonObjectMapper()
         private val session = StandardWebSocketClient().doHandshake(this, "ws://$url/web-socket").get()!!
+        private var newGameId: String? = null
 
-        var newGameId: String? = null
         var gameStatus: GameSessionStatus? = null
-
         val messages = arrayListOf<GameMessageUpdate>()
 
         suspend fun login() {
@@ -72,6 +89,12 @@ class IntegrationTest {
 
         suspend fun startGame() {
             session.sendMessage(toJson(StartGameMessage()))
+            delay(100)
+        }
+
+
+        suspend fun joinGame() {
+            session.sendMessage(toJson(JoinGameMessage(gameId = newGameId!!)))
             delay(100)
         }
 
