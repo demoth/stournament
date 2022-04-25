@@ -10,9 +10,9 @@ import org.davnokodery.rigel.TestDataCreator.Companion.testUser3
 import org.davnokodery.rigel.model.GameSessionStatus
 import org.davnokodery.rigel.model.GameSessionStatus.Player_1_Turn
 import org.davnokodery.rigel.model.GameSessionStatus.Player_2_Turn
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.slf4j.LoggerFactory
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.client.TestRestTemplate
@@ -75,6 +75,24 @@ class IntegrationTest {
         assertTrue(tester1.gameStatus == Player_1_Turn || tester1.gameStatus == Player_2_Turn)
     }
 
+    @Test
+    fun `relogin - previous connections are dropped`() = runBlocking {
+        val user = TestClient(loginPost(testUser1))
+        user.login()
+
+        val sameUser = TestClient(loginPost(testUser1))
+        sameUser.login()
+
+        assertTrue(sameUser.connected)
+        assertFalse(user.connected)
+
+        val ex = assertThrows<IllegalStateException> {
+            user.createGame()
+        }
+
+        assertEquals("Not connected!", ex.message)
+    }
+
     private val url
         get() = "localhost:$port"
 
@@ -97,32 +115,40 @@ class IntegrationTest {
         var gameStatus: GameSessionStatus? = null
         val messages = arrayListOf<GameMessageUpdate>()
 
+        var connected = false
+
         suspend fun login() {
+            check(connected) { "Not connected!" }
             session.sendMessage(TextMessage(mapper.writeValueAsString(JwtMessage("Bearer $jwt"))))
             delay(100)
         }
 
         suspend fun createGame() {
+            check(connected) { "Not connected!" }
             session.sendMessage(toJson(CreateGameMessage()))
             delay(100)
         }
 
         suspend fun startGame() {
+            check(connected) { "Not connected!" }
             session.sendMessage(toJson(StartGameMessage()))
             delay(100)
         }
 
 
         suspend fun joinGame() {
+            check(connected) { "Not connected!" }
             session.sendMessage(toJson(JoinGameMessage(gameId = newGameId!!)))
             delay(100)
         }
 
         override fun afterConnectionEstablished(session: WebSocketSession) {
             logger.debug("Connection established")
+            connected = true
         }
 
         override fun handleMessage(session: WebSocketSession, message: WebSocketMessage<*>) {
+            check(connected) { "Not connected!" }
             logger.debug("Received message: $message")
             if (message !is TextMessage) {
                 logger.error("Non text message received!")
@@ -154,6 +180,7 @@ class IntegrationTest {
 
         override fun afterConnectionClosed(session: WebSocketSession, closeStatus: CloseStatus) {
             logger.debug("connection closed status=$closeStatus")
+            connected = false
         }
 
         override fun supportsPartialMessages() = false

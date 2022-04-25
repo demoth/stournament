@@ -26,7 +26,7 @@ fun interface MessageSender {
 @Component
 class UserSessionManager(
     @Autowired val authService: AuthService
-): TextWebSocketHandler(){
+) : TextWebSocketHandler() {
 
     private val logger = LoggerFactory.getLogger(UserSessionManager::class.java)
     private val sessions: MutableMap<String, UserSession> = ConcurrentHashMap()
@@ -66,16 +66,27 @@ class UserSessionManager(
             is JwtMessage -> {
                 // check user authentication
                 if (userSession.user == null) {
-                        try {
-                            userSession.user = authService.validateToken(request.jwt)
-                        } catch (e: Exception) {
-                            logger.error("Could not prove login: ", e)
-                            session.close()
-                            return
+                    try {
+                        val user = authService.validateToken(request.jwt)
+                        userSession.user = user
+
+                        // drop other active sessions for the same user
+                        sessions.values.forEach {
+                            if (it.user != null
+                                && it.user?.name == user.name
+                                && it.session.id != userSession.session.id
+                            ) {
+                                logger.debug("Dropping existing session ${it.session.id} for user ${user.name}")
+                                it.session.close()
+                            }
                         }
+                    } catch (e: Exception) {
+                        logger.error("Could not prove login: ", e)
+                        session.close()
+                        return
+                    }
                 } else {
-                    logger.warn("Unexpected JwtMessage for user: ${session.id}, disconnecting")
-                    session.close()
+                    logger.warn("Unexpected JwtMessage for user: ${session.id}")
                 }
             }
             is CreateGameMessage -> {
@@ -89,7 +100,7 @@ class UserSessionManager(
                         name = userSession.user!!.name,
                         sender = {
                             userSession.session.sendMessage(toJson(it))
-                    }),
+                        }),
                     sender = {
                         val gameSession = games[gameId]!!
                         // broadcast message
