@@ -71,8 +71,8 @@ class IntegrationTest {
         tester1.createGame()
         tester2.joinGame()
         tester1.startGame()
-        assertEquals(tester1.gameStatus, tester2.gameStatus)
-        assertTrue(tester1.gameStatus == Player_1_Turn || tester1.gameStatus == Player_2_Turn)
+        assertEquals(tester1.currentGameStatus, tester2.currentGameStatus)
+        assertTrue(tester1.currentGameStatus == Player_1_Turn || tester1.currentGameStatus == Player_2_Turn)
     }
 
     @Test
@@ -93,6 +93,26 @@ class IntegrationTest {
         assertEquals("Not connected!", ex.message)
     }
 
+    @Test
+    fun `gameList - get game ids`() = runBlocking {
+        val tester1 = TestClient(loginPost(testUser1))
+        tester1.login()
+        tester1.createGame()
+        assertFalse(tester1.gameIds.isEmpty())
+
+        val tester2 = TestClient(loginPost(testUser2))
+        tester2.login()
+
+        // no games since joined after the game was created
+        assertTrue(tester2.gameIds.isEmpty())
+        tester2.requestGameIds()
+        // should have received games by this time
+        assertFalse(tester2.gameIds.isEmpty())
+
+        // should be the same as above
+        assertEquals(tester1.gameIds.first(), tester2.gameIds.first())
+    }
+
     private val url
         get() = "localhost:$port"
 
@@ -110,9 +130,9 @@ class IntegrationTest {
     inner class TestClient(private val jwt: String) : WebSocketHandler {
         private val mapper = jacksonObjectMapper()
         private val session = StandardWebSocketClient().doHandshake(this, "ws://$url/web-socket").get()!!
-        private var newGameId: String? = null
 
-        var gameStatus: GameSessionStatus? = null
+        val gameIds = hashSetOf<String>()
+        var currentGameStatus: GameSessionStatus? = null
         val messages = arrayListOf<GameMessageUpdate>()
 
         var connected = false
@@ -135,10 +155,15 @@ class IntegrationTest {
             delay(100)
         }
 
-
         suspend fun joinGame() {
             check(connected) { "Not connected!" }
-            session.sendMessage(toJson(JoinGameMessage(gameId = newGameId!!)))
+            session.sendMessage(toJson(JoinGameMessage(gameId = gameIds.first())))
+            delay(100)
+        }
+
+        suspend fun requestGameIds() {
+            check(connected) { "Not connected!" }
+            session.sendMessage(toJson(GameListRequest()))
             delay(100)
         }
 
@@ -149,7 +174,6 @@ class IntegrationTest {
 
         override fun handleMessage(session: WebSocketSession, message: WebSocketMessage<*>) {
             check(connected) { "Not connected!" }
-            logger.debug("Received message: $message")
             if (message !is TextMessage) {
                 logger.error("Non text message received!")
                 return
@@ -158,17 +182,11 @@ class IntegrationTest {
             val msg: ServerWsMessage = mapper.readValue(message.payload)
             logger.debug("Received: $msg")
             when (msg) {
-                is NewGameCreated -> {
-                    newGameId = msg.gameId
-                }
-                is GameMessageUpdate -> {
-                    messages.add(msg)
-                }
-                is GameStatusUpdate -> {
-                    gameStatus = msg.newStatus
-                }
+                is NewGameCreated -> gameIds.add(msg.gameId)
+                is GameMessageUpdate -> messages.add(msg)
+                is GameStatusUpdate -> currentGameStatus = msg.newStatus
                 is CardPlayed -> TODO()
-                is GamesListResponse -> TODO()
+                is GamesListResponse -> gameIds.addAll(msg.games)
                 is PlayerPropertyChange -> TODO()
             }
 
