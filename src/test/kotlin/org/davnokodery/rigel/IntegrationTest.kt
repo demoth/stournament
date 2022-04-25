@@ -5,6 +5,8 @@ import com.fasterxml.jackson.module.kotlin.readValue
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.davnokodery.rigel.TestDataCreator.Companion.testUser1
+import org.davnokodery.rigel.TestDataCreator.Companion.testUser2
+import org.davnokodery.rigel.TestDataCreator.Companion.testUser3
 import org.davnokodery.rigel.model.GameSessionStatus
 import org.davnokodery.rigel.model.GameSessionStatus.Player_1_Turn
 import org.davnokodery.rigel.model.GameSessionStatus.Player_2_Turn
@@ -41,11 +43,29 @@ class IntegrationTest {
     }
 
     @Test
+    fun `start game - game is full`() = runBlocking {
+        val tester1 = TestClient(loginPost(testUser1))
+        tester1.login()
+
+        val tester2 = TestClient(loginPost(testUser2))
+        tester2.login()
+
+        val tester3 = TestClient(loginPost(testUser3))
+        tester3.login()
+
+        tester1.createGame()
+        tester2.joinGame()
+        tester3.joinGame() // fail
+
+        assertEquals("Game is full", tester3.messages.firstOrNull()?.message)
+    }
+
+    @Test
     fun `start game - positive`() = runBlocking {
         val tester1 = TestClient(loginPost(testUser1))
         tester1.login()
 
-        val tester2 = TestClient(loginPost(testUser1))
+        val tester2 = TestClient(loginPost(testUser2))
         tester2.login()
 
         tester1.createGame()

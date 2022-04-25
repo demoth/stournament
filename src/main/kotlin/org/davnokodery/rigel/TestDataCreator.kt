@@ -15,13 +15,15 @@ class TestDataCreator(
     companion object {
         val testUser1 = User("julia", "hello")
         val testUser2 = User("daniil", "world")
+        val testUser3 = User("john", "wick")
     }
     private val logger = LoggerFactory.getLogger(TestDataCreator::class.java)
 
     override fun run(vararg args: String?) {
-        userRepository.save(testUser1)
-        logger.debug("Added test user $testUser1")
-        userRepository.save(testUser2)
-        logger.debug("Added test user $testUser2")
+
+        listOf(testUser1, testUser2, testUser3).forEach {
+            userRepository.save(it)
+            logger.debug("Added test user $it")
+        }
     }
 }

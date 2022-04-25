@@ -125,6 +125,7 @@ class UserSessionManager(
                     return
                 }
                 if (gameSession.player2 != null) {
+                    // todo: check if game is not started yet
                     gameSession.startGame()
                     logger.debug("Game started ${gameSession.id}")
                 } else {
@@ -138,15 +139,18 @@ class UserSessionManager(
                     logger.warn("No such game") // todo: send error response
                     return
                 }
-                // todo: check if no one else has joined
-                gameSession.player2 = SessionPlayer(
-                    sessionId = session.id,
-                    name = userSession.user!!.name,
-                    sender = {
-                        userSession.session.sendMessage(TextMessage(mapper.writeValueAsString(it)))
-                    }
-                )
-                logger.debug("Joined player: ${userSession.user!!.name}, game id: ${gameSession.id}")
+                if (gameSession.player2 == null) {
+                    gameSession.player2 = SessionPlayer(
+                        sessionId = session.id,
+                        name = userSession.user!!.name,
+                        sender = {
+                            userSession.session.sendMessage(TextMessage(mapper.writeValueAsString(it)))
+                        }
+                    )
+                    logger.debug("Joined player: ${userSession.user!!.name}, game id: ${gameSession.id}")
+                } else {
+                    session.sendMessage(toJson(GameMessageUpdate("Game is full")))
+                }
             }
             is PlayCardMessage -> {
                 val gameSession = findGameByPlayerId(session.id)
