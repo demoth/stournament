@@ -10,10 +10,12 @@ import org.davnokodery.rigel.TestDataCreator.Companion.testUser3
 import org.davnokodery.rigel.model.GameSessionStatus
 import org.davnokodery.rigel.model.GameSessionStatus.Player_1_Turn
 import org.davnokodery.rigel.model.GameSessionStatus.Player_2_Turn
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.boot.test.web.client.postForEntity
@@ -26,12 +28,20 @@ import org.springframework.web.socket.client.standard.StandardWebSocketClient
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test-data")
-class IntegrationTest {
+class IntegrationTest(
+    @Autowired
+    val userSessionManager: UserSessionManager
+) {
     @LocalServerPort
     private var port: Int = 0
     private var restTemplate = TestRestTemplate()
     private val logger = LoggerFactory.getLogger(IntegrationTest::class.java)
     private val mapper = jacksonObjectMapper()
+
+    @AfterEach
+    fun tearDown() {
+        userSessionManager.reset()
+    }
 
     @Test
     fun `start game - not enough players`() = runBlocking {

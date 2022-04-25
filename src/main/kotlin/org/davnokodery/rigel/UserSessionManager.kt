@@ -184,4 +184,10 @@ class UserSessionManager(
     }
 
     private fun toJson(it: ServerWsMessage) = TextMessage(mapper.writeValueAsString(it))
+
+    fun reset() {
+        sessions.values.forEach { it.session.close() }
+        sessions.clear()
+        games.clear()
+    }
 }
