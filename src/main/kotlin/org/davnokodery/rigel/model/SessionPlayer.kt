@@ -32,6 +32,9 @@ data class SessionPlayer(
         sender.send(PlayerPropertyChange(sessionId, property, delta))
     }
 
+    /**
+     * Remove all temporary property changes associates with a given card id.
+     */
     fun removeTemporaryPropertyChange(id: CardId) {
         propertyChanges.forEach { (property, changes) ->
             val oldDelta = changes.remove(id)
