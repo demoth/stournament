@@ -9,14 +9,34 @@ enum class GameSessionStatus {
     Player_1_Turn,
     Player_2_Turn,
     Player_1_Won,
-    Player_2_Won,
+    Player_2_Won;
+
+    fun started(): Boolean {
+        return this == Player_1_Turn || this == Player_2_Turn
+    }
+    
+    fun finished(): Boolean {
+        return this == Player_1_Won || this == Player_2_Won
+    }
+}
+
+interface GameRules {
+
+    fun onGameStarted(player: SessionPlayer, enemyPlayer: SessionPlayer, gameSession: GameSession)
+
+    fun afterCardPlayed(card: Card, player: SessionPlayer, enemyPlayer: SessionPlayer, gameSession: GameSession)
+    
+    fun beforeCardPlayed(card: Card, player: SessionPlayer, enemyPlayer: SessionPlayer, gameSession: GameSession): Boolean
+    
+    fun onEndTurn(player: SessionPlayer, enemyPlayer: SessionPlayer, gameSession: GameSession)
 }
 
 data class GameSession(
     val id: String,
     val player1: SessionPlayer,
     internal val sender: MessageSender,
-    internal var status: GameSessionStatus = GameSessionStatus.Created,
+    internal val gameRules: GameRules,
+    internal var status: GameSessionStatus = GameSessionStatus.Created
 ) {
     private val logger = LoggerFactory.getLogger(GameSession::class.java)
 
@@ -32,6 +52,8 @@ data class GameSession(
     }
 
     fun startGame() {
+        checkNotNull(player2)
+        gameRules.onGameStarted(player1, player2!!, this)
         if (Random().nextBoolean()) {
             changeStatus(GameSessionStatus.Player_1_Turn)
         } else {
@@ -97,15 +119,18 @@ data class GameSession(
                 return
             }
 
-            card.onApply?.activate(card, currentPlayer, enemyPlayer, targetEffect)
-            currentPlayer.cards.remove(card.id)
-            if (card.ttl > 0) {
-                // if a card has a lasting effect -> move it to the current effects
-                currentPlayer.effects[card.id] = card
-                send(CardPlayed(card.id, false))
-            } else {
-                // discard otherwise
-                send(CardPlayed(card.id, true))
+            if (gameRules.beforeCardPlayed(card, currentPlayer, enemyPlayer, this)) {
+                card.onApply?.activate(card, currentPlayer, enemyPlayer, targetEffect)
+                currentPlayer.cards.remove(card.id)
+                if (card.ttl > 0) {
+                    // if a card has a lasting effect -> move it to the current effects
+                    currentPlayer.effects[card.id] = card
+                    send(CardPlayed(card.id, false))
+                } else {
+                    // discard otherwise
+                    send(CardPlayed(card.id, true))
+                }
+                gameRules.afterCardPlayed(card, currentPlayer, enemyPlayer, this)
             }
         } else {
             // end turn
@@ -124,6 +149,7 @@ data class GameSession(
                 currentPlayer.effects.remove(it.id)
                 send(CardPlayed(it.id, true))
             }
+            gameRules.onEndTurn(currentPlayer, enemyPlayer, this)
             changeStatus(if (status == GameSessionStatus.Player_1_Turn) GameSessionStatus.Player_2_Turn else GameSessionStatus.Player_1_Turn)
         }
     }

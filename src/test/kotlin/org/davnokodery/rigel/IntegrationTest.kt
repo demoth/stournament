@@ -4,6 +4,7 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.davnokodery.rigel.TestDataCreator.Companion.testUser1
 import org.davnokodery.rigel.TestDataCreator.Companion.testUser2
 import org.davnokodery.rigel.TestDataCreator.Companion.testUser3
@@ -83,6 +84,7 @@ class IntegrationTest(
         tester1.startGame()
         assertEquals(tester1.currentGameStatus, tester2.currentGameStatus)
         assertTrue(tester1.currentGameStatus == Player_1_Turn || tester1.currentGameStatus == Player_2_Turn)
+        assertTrue(tester1.currentGameStatus!!.started())
     }
 
     @Test
@@ -143,38 +145,40 @@ class IntegrationTest(
 
         val gameIds = hashSetOf<String>()
         var currentGameStatus: GameSessionStatus? = null
+        
         val messages = arrayListOf<GameMessageUpdate>()
+        val properties = mutableMapOf<String, Int>()
 
         var connected = false
 
         suspend fun login() {
             check(connected) { "Not connected!" }
             session.sendMessage(TextMessage(mapper.writeValueAsString(JwtMessage("Bearer $jwt"))))
-            delay(100)
+            delay(200)
         }
 
         suspend fun createGame() {
             check(connected) { "Not connected!" }
             session.sendMessage(toJson(CreateGameMessage()))
-            delay(100)
+            delay(200)
         }
 
         suspend fun startGame() {
             check(connected) { "Not connected!" }
             session.sendMessage(toJson(StartGameMessage()))
-            delay(100)
+            delay(200)
         }
 
         suspend fun joinGame() {
             check(connected) { "Not connected!" }
             session.sendMessage(toJson(JoinGameMessage(gameId = gameIds.first())))
-            delay(100)
+            delay(200)
         }
 
         suspend fun requestGameIds() {
             check(connected) { "Not connected!" }
             session.sendMessage(toJson(GameListRequest()))
-            delay(100)
+            delay(200)
         }
 
         override fun afterConnectionEstablished(session: WebSocketSession) {
@@ -190,16 +194,15 @@ class IntegrationTest(
             }
 
             val msg: ServerWsMessage = mapper.readValue(message.payload)
-            logger.debug("Received: $msg")
+            logger.debug("Received (${session.id}): $msg")
             when (msg) {
                 is NewGameCreated -> gameIds.add(msg.gameId)
                 is GameMessageUpdate -> messages.add(msg)
                 is GameStatusUpdate -> currentGameStatus = msg.newStatus
                 is CardPlayed -> TODO()
                 is GamesListResponse -> gameIds.addAll(msg.games)
-                is PlayerPropertyChange -> TODO()
+                is PlayerPropertyChange -> properties[msg.property] = (properties[msg.property] ?: 0) + msg.delta
             }
-
         }
 
         override fun handleTransportError(session: WebSocketSession, exception: Throwable) {

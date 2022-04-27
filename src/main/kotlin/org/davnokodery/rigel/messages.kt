@@ -3,7 +3,6 @@ package org.davnokodery.rigel
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import org.davnokodery.rigel.model.GameSessionStatus
-import org.davnokodery.rigel.model.PlayerProperty
 import java.util.*
 
 ///////////////////////
@@ -34,7 +33,7 @@ data class NewGameCreated(val gameId: String) : ServerWsMessage()
 
 // targeted
 data class GameMessageUpdate(val message: String, val playerSessionId: String? = null) : ServerWsMessage()
-data class PlayerPropertyChange(val playerSessionId: String, val property: PlayerProperty, val delta: Int) : ServerWsMessage()
+data class PlayerPropertyChange(val playerSessionId: String, val property: String, val delta: Int) : ServerWsMessage()
 data class GamesListResponse(val games: Collection<String>) : ServerWsMessage()
 
 ///////////////////////
@@ -59,8 +58,8 @@ sealed class ClientWsMessage {
 
 data class JwtMessage(val jwt: String) : ClientWsMessage()
 class CreateGameMessage : ClientWsMessage()
-class JoinGameMessage(val gameId: String): ClientWsMessage()
+data class JoinGameMessage(val gameId: String): ClientWsMessage()
 class StartGameMessage: ClientWsMessage()
-class PlayCardMessage(val cardId: String, val targetId: String): ClientWsMessage()
+data class PlayCardMessage(val cardId: String, val targetId: String): ClientWsMessage()
 class SkipTurnMessage: ClientWsMessage()
 class GameListRequest: ClientWsMessage()
