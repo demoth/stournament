@@ -4,16 +4,15 @@ import org.davnokodery.rigel.CardPlayed
 import org.davnokodery.rigel.MessageSender
 import org.davnokodery.rigel.NewCard
 import org.davnokodery.rigel.PlayerPropertyChange
-import java.util.*
 
 data class SessionPlayer(
     val sessionId: String,
     val name: String,
-    val sender: MessageSender,
+    private val sender: MessageSender,
     private val properties: MutableMap<String, Int> = hashMapOf(),
     private val propertyChanges: MutableMap<String, MutableMap<CardId, Int>> = hashMapOf(),
     private val cards: MutableMap<String, Card> = hashMapOf(), // todo make it private
-    val effects: MutableMap<String, Card> = hashMapOf()
+    private val effects: MutableMap<String, Card> = hashMapOf()
 ) {
 
     fun addCard(card: Card) {
@@ -36,7 +35,7 @@ data class SessionPlayer(
     /**
      * Remove all temporary property changes associates with a given card id.
      */
-    fun removeTemporaryPropertyChange(id: CardId) {
+    private fun removeTemporaryPropertyChange(id: CardId) {
         propertyChanges.forEach { (property, changes) ->
             val oldDelta = changes.remove(id)
             if (oldDelta != null) {
@@ -77,4 +76,22 @@ data class SessionPlayer(
     fun findCardByName(name: String) = cards.values.find { it.name == name }
 
     fun findCardById(id: String) = cards.values.find { it.id == id }
+
+    fun findEffectById(id: String) = effects.values.find { it.id == id }
+
+    fun updateEffects(currentPlayer: SessionPlayer, enemyPlayer: SessionPlayer) = effects.values.filter {
+        it.onTick?.effect(it, currentPlayer, enemyPlayer)
+        it.ttl--
+        if (it.ttl <= 0) {
+            it.onExpire?.effect(it, currentPlayer, enemyPlayer)
+            currentPlayer.removeTemporaryPropertyChange(it.id)
+            enemyPlayer.removeTemporaryPropertyChange(it.id)
+        }
+        it.ttl <= 0
+    }
+
+    fun removeEffect(id: String) {
+        effects.remove(id)
+        sender.send(CardPlayed(id, true))
+    }
 }

@@ -8,6 +8,7 @@ import kotlinx.coroutines.withContext
 import org.davnokodery.rigel.TestDataCreator.Companion.testUser1
 import org.davnokodery.rigel.TestDataCreator.Companion.testUser2
 import org.davnokodery.rigel.TestDataCreator.Companion.testUser3
+import org.davnokodery.rigel.model.CardData
 import org.davnokodery.rigel.model.GameSessionStatus
 import org.davnokodery.rigel.model.GameSessionStatus.Player_1_Turn
 import org.davnokodery.rigel.model.GameSessionStatus.Player_2_Turn
@@ -148,7 +149,8 @@ class IntegrationTest(
         
         val messages = arrayListOf<GameMessageUpdate>()
         val properties = mutableMapOf<String, Int>()
-
+        val cards = mutableMapOf<String, CardData>()
+        val effects = mutableMapOf<String, CardData>()
         var connected = false
 
         suspend fun login() {
@@ -199,9 +201,19 @@ class IntegrationTest(
                 is NewGameCreated -> gameIds.add(msg.gameId)
                 is GameMessageUpdate -> messages.add(msg)
                 is GameStatusUpdate -> currentGameStatus = msg.newStatus
-                is CardPlayed -> TODO()
                 is GamesListResponse -> gameIds.addAll(msg.games)
                 is PlayerPropertyChange -> properties[msg.property] = (properties[msg.property] ?: 0) + msg.delta
+                is NewCard -> cards[msg.cardData.id] = msg.cardData
+                is CardPlayed -> {
+                    if (msg.discarded) {
+                        cards.remove(msg.cardId)
+                        effects.remove(msg.cardId)
+                    } else {
+                        val card = cards[msg.cardId]
+                        check(card != null) { "Effect cannot be applied: no such card: ${msg.cardId}"}
+                        effects[msg.cardId] = cards.remove(msg.cardId)!!
+                    }
+                }
             }
         }
 

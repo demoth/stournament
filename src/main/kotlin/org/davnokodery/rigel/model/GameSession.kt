@@ -113,13 +113,15 @@ data class GameSession(
         if (cardId != null) {
 
             // selected card or effect exists
-            val card = currentPlayer.findCardById(cardId) ?: currentPlayer.effects[cardId]
+            val card = currentPlayer.findCardById(cardId) ?: currentPlayer.findEffectById(cardId)
             if (card == null) {
                 send(GameMessageUpdate("Error! No such card!", currentPlayer.sessionId))
                 return
             }
 
-            val targetEffect = currentPlayer.effects[target] ?: enemyPlayer.effects[target]
+            val targetEffect = if (target != null) {
+                currentPlayer.findEffectById(target) ?: enemyPlayer.findEffectById(target)
+            } else null
 
             if (target != null && targetEffect == null) {
                 send(GameMessageUpdate("Target not found!", currentPlayer.sessionId))
@@ -142,19 +144,10 @@ data class GameSession(
         } else {
             // end turn
             // activate current effects
-            val expiredEffects = currentPlayer.effects.values.filter {
-                it.onTick?.effect(it, currentPlayer, enemyPlayer)
-                it.ttl--
-                if (it.ttl <= 0) {
-                    it.onExpire?.effect(it, currentPlayer, enemyPlayer)
-                    listOf(player1, secondPlayer).forEach { p -> p.removeTemporaryPropertyChange(it.id) }
-                }
-                it.ttl <= 0
-            }
+            val expiredEffects = currentPlayer.updateEffects(currentPlayer, enemyPlayer)
             // remove the expired effects and sent updates
             expiredEffects.forEach {
-                currentPlayer.effects.remove(it.id)
-                send(CardPlayed(it.id, true))
+                currentPlayer.removeEffect(it.id)
             }
             gameRules.onEndTurn(currentPlayer, enemyPlayer, this)
             changeStatus(if (status == GameSessionStatus.Player_1_Turn) GameSessionStatus.Player_2_Turn else GameSessionStatus.Player_1_Turn)
