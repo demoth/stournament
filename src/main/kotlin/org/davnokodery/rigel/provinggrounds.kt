@@ -1,6 +1,7 @@
 package org.davnokodery.rigel
 
 import org.davnokodery.rigel.model.*
+import kotlin.random.Random
 
 // Test game logic, a.k.a Proving Grounds
 
@@ -55,7 +56,13 @@ fun provingGroundsRules(): GameRules {
         }
 
         override fun onEndTurn(player: SessionPlayer, enemyPlayer: SessionPlayer, gameSession: GameSession) {
-            // deal a new card for example  
+            val newCard = when (Random.nextInt(3)) {
+                0 -> createFireShieldCard()
+                1 -> createIceShieldCard()
+                2 -> createHealingCard()
+                else -> createFireballCard()
+            }
+            player.addCard(newCard)  
         }
     }
 }

@@ -4,7 +4,6 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
 import org.davnokodery.rigel.TestDataCreator.Companion.testUser1
 import org.davnokodery.rigel.TestDataCreator.Companion.testUser2
 import org.davnokodery.rigel.TestDataCreator.Companion.testUser3
@@ -86,6 +85,52 @@ class IntegrationTest(
         assertEquals(tester1.currentGameStatus, tester2.currentGameStatus)
         assertTrue(tester1.currentGameStatus == Player_1_Turn || tester1.currentGameStatus == Player_2_Turn)
         assertTrue(tester1.currentGameStatus!!.started())
+    }
+
+    @Test
+    fun `play card - positive`() = runBlocking {
+        val tester1 = TestClient(loginPost(testUser1))
+        tester1.login()
+
+        val tester2 = TestClient(loginPost(testUser2))
+        tester2.login()
+
+        tester1.createGame()
+        tester2.joinGame()
+        tester1.startGame()
+        
+        check(tester1.currentGameStatus != null) { "Not received the state yet" }
+        val currentPlayer = if (tester1.currentGameStatus == Player_1_Turn) tester1 else tester2
+        val opponent = if (tester1.currentGameStatus != Player_1_Turn) tester1 else tester2
+        
+        assertEquals(100, opponent.properties[PROP_HEALTH])
+        currentPlayer.playCard(currentPlayer.cards.values.find { it.name == FIRE_BALL_NAME })
+        assertEquals(95, opponent.properties[PROP_HEALTH])
+        assertNull(currentPlayer.cards.values.find { it.name == FIRE_BALL_NAME })
+    }
+
+    @Test
+    fun `play card - end turn`() = runBlocking {
+        val tester1 = TestClient(loginPost(testUser1))
+        tester1.login()
+
+        val tester2 = TestClient(loginPost(testUser2))
+        tester2.login()
+
+        tester1.createGame()
+        tester2.joinGame()
+        tester1.startGame()
+        
+        val currentPlayer = if (tester1.currentGameStatus == Player_1_Turn) tester1 else tester2
+        val status = tester1.currentGameStatus
+        val amountOfCards = currentPlayer.cards.size
+        
+        currentPlayer.playCard(null)
+        
+        // one new received
+        assertEquals(amountOfCards + 1, currentPlayer.cards.size)
+        // end turn
+        assertNotEquals(status, tester1.currentGameStatus)
     }
 
     @Test
@@ -183,6 +228,12 @@ class IntegrationTest(
             delay(200)
         }
 
+        suspend fun playCard(cardId: CardData?) {
+            check(connected) { "Not connected!" }
+            session.sendMessage(toJson(PlayCardMessage(cardId?.id)))
+            delay(200)
+        }
+
         override fun afterConnectionEstablished(session: WebSocketSession) {
             logger.debug("Connection established")
             connected = true
@@ -202,7 +253,7 @@ class IntegrationTest(
                 is GameMessageUpdate -> messages.add(msg)
                 is GameStatusUpdate -> currentGameStatus = msg.newStatus
                 is GamesListResponse -> gameIds.addAll(msg.games)
-                is PlayerPropertyChange -> properties[msg.property] = (properties[msg.property] ?: 0) + msg.delta
+                is PlayerPropertyChange -> properties[msg.property] = (properties[msg.property] ?: 0) + msg.delta //todo: don't calculate on client side, receive final value
                 is NewCard -> cards[msg.cardData.id] = msg.cardData
                 is CardPlayed -> {
                     if (msg.discarded) {
