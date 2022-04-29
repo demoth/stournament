@@ -22,13 +22,13 @@ data class Card(
     val name: String,
     val iconName: String,
     val description: String,
-    val tags: Set<String> = hashSetOf(), // todo: enum?
+    val tags: Set<String> = hashSetOf(),
 
     // returns Error message if the card cannot be played
     val validator: Validator? = null,
 
     // instance section
-    val properties: MutableMap<String, Int> = hashMapOf(), // todo: enum keys?
+    val properties: MutableMap<String, Int> = hashMapOf(),
     val id: CardId = UUID.randomUUID().toString(),
     /**
      * Instant action related the played card, the card can save the id of the target,
@@ -47,4 +47,17 @@ data class Card(
      * TTL = 2 means 2 owning player turns and 1 enemy player's turn.
      */
     var ttl: Int = 0, // when reaches 0 the effect expires
+) {
+    fun toCardData() = CardData(id, name, iconName, description, tags)
+}
+
+/**
+ * What is sent to the client
+ */
+data class CardData(
+    val id: String,
+    val name: String,
+    val iconName: String,
+    val description: String,
+    val tags: Set<String> = hashSetOf()
 )

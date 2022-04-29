@@ -22,12 +22,25 @@ enum class GameSessionStatus {
 
 interface GameRules {
 
+    /**
+     * Initialize players: add required properties and starting cards.
+     */
     fun onGameStarted(player: SessionPlayer, enemyPlayer: SessionPlayer, gameSession: GameSession)
 
     fun afterCardPlayed(card: Card, player: SessionPlayer, enemyPlayer: SessionPlayer, gameSession: GameSession)
-    
+
+    /**
+     * Place common checks before the card is going to be played.
+     * All technical checks are passed till this point, but the card can still be rejected by the card validation logic.
+     * Therefore, don't change the card or players, because the card may not be played.
+     * Information messages can be sent to the player through the player.sender
+     * @return false if card should not be played.
+     */
     fun beforeCardPlayed(card: Card, player: SessionPlayer, enemyPlayer: SessionPlayer, gameSession: GameSession): Boolean
-    
+
+    /**
+     * Called just before the turn is changed. All effects and expiration logic is already executed.
+     */
     fun onEndTurn(player: SessionPlayer, enemyPlayer: SessionPlayer, gameSession: GameSession)
 }
 
@@ -100,7 +113,7 @@ data class GameSession(
         if (cardId != null) {
 
             // selected card or effect exists
-            val card = currentPlayer.cards[cardId] ?: currentPlayer.effects[cardId]
+            val card = currentPlayer.findCardById(cardId) ?: currentPlayer.effects[cardId]
             if (card == null) {
                 send(GameMessageUpdate("Error! No such card!", currentPlayer.sessionId))
                 return
@@ -121,15 +134,9 @@ data class GameSession(
 
             if (gameRules.beforeCardPlayed(card, currentPlayer, enemyPlayer, this)) {
                 card.onApply?.activate(card, currentPlayer, enemyPlayer, targetEffect)
-                currentPlayer.cards.remove(card.id)
-                if (card.ttl > 0) {
-                    // if a card has a lasting effect -> move it to the current effects
-                    currentPlayer.effects[card.id] = card
-                    send(CardPlayed(card.id, false))
-                } else {
-                    // discard otherwise
-                    send(CardPlayed(card.id, true))
-                }
+                
+                currentPlayer.cardPlayed(card)
+                
                 gameRules.afterCardPlayed(card, currentPlayer, enemyPlayer, this)
             }
         } else {

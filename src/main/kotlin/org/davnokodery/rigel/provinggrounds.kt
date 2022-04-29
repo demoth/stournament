@@ -9,6 +9,12 @@ const val PROP_HEALTH_MAX = "health_max"
 const val PROP_COLD_RESIST = "resist_cold"
 const val PROP_FIRE_RESIST = "resist_fire"
 
+// card names
+const val FIRE_BALL_NAME = "fireball"
+const val HEALING_NAME = "healing"
+const val FIRE_SHIELD_NAME = "fireShield"
+const val ICE_SHIELD_NAME = "iceShield"
+
 fun provingGroundsRules(): GameRules {
     return object : GameRules {
         override fun onGameStarted(player: SessionPlayer, enemyPlayer: SessionPlayer, gameSession: GameSession) {
@@ -22,10 +28,10 @@ fun provingGroundsRules(): GameRules {
                 ).forEach { (prop, value) -> p.changeProperty(prop, value) }
 
                 // add start deck
-                createHealingCard(p.name).let { p.cards[it.id] = it }
-                createFireballCard(p.name).let { p.cards[it.id] = it }
-                createIceShieldCard(p.name).let { p.cards[it.id] = it }
-                createFireShieldCard(p.name).let { p.cards[it.id] = it }
+                p.addCard(createHealingCard())
+                p.addCard(createFireballCard())
+                p.addCard(createIceShieldCard())
+                p.addCard(createFireShieldCard())
             }
         }
         
@@ -54,11 +60,10 @@ fun provingGroundsRules(): GameRules {
     }
 }
 
-private fun createHealingCard(player: String) = Card(
-    id = "healing_$player",
-    name = "healing_$player",
-    iconName = "healing_$player",
-    description = "heal 1 hp for 3 turns",
+private fun createHealingCard() = Card(
+    name = HEALING_NAME,
+    iconName = HEALING_NAME,
+    description = HEALING_NAME,
     validator = { _, p, _, _ ->
         if (p.getProperty(PROP_HEALTH) >= p.getProperty(PROP_HEALTH_MAX))
             "Health is already full"
@@ -74,34 +79,32 @@ private fun createHealingCard(player: String) = Card(
 )
 
 // todo: use damage function instead of direct property manipulation
-private fun createFireballCard(player: String) = Card(
-    id = "fireball_$player",
-    name = "fireball_$player",
-    iconName = "fireball_$player",
-    description = "fireball_$player",
+private fun createFireballCard() = Card(
+    name = FIRE_BALL_NAME,
+    iconName = FIRE_BALL_NAME,
+    description = FIRE_BALL_NAME,
     onApply = { _, _, e, _ ->
         e.changeProperty(PROP_HEALTH, -5)
     })
 
-private fun createIceShieldCard(player: String) = Card(
-    id = "iceShield_$player",
-    name = "iceShield_$player",
-    iconName = "iceShield_$player",
-    description = "iceShield_$player",
+
+private fun createIceShieldCard() = Card(
+    name = ICE_SHIELD_NAME,
+    iconName = ICE_SHIELD_NAME,
+    description = ICE_SHIELD_NAME,
     ttl = 2,
-    onApply = { _, p, _, _ ->
-        p.changePropertyTemporary(PROP_COLD_RESIST, 15, "iceShield_$player")
+    onApply = { c, p, _, _ ->
+        p.changePropertyTemporary(PROP_COLD_RESIST, 15, c.id)
     })
 
 /**
  * Adds a diminishing fire resist for 2 turns: 1st turn +20%, 2nd +10%
  */
-private fun createFireShieldCard(player: String) = Card(
-    id = "fireShield_$player",
-    name = "fireShield_$player",
-    iconName = "fireShield_$player",
-    description = "fireShield_$player",
+private fun createFireShieldCard() = Card(
+    name = FIRE_SHIELD_NAME,
+    iconName = FIRE_SHIELD_NAME,
+    description = FIRE_SHIELD_NAME,
     ttl = 3,
     onTick = { c, p, _ ->
-        p.changePropertyTemporary(PROP_FIRE_RESIST, c.ttl * 10, "fireShield_$player")
+        p.changePropertyTemporary(PROP_FIRE_RESIST, c.ttl * 10, c.id)
     })

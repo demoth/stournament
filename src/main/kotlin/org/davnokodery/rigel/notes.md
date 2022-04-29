@@ -1,3 +1,11 @@
+# Todo:
+
+ - handle player disconnection
+ - send players cards/effect updates over the network 
+ - send game state on connect/reconnect
+ - make some updates visible to all players (for example, when opponent's health is changed)
+ - improve message interface of game session/player
+
 # Draft model classes
 
 card

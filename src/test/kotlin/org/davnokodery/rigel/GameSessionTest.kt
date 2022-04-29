@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
+
 internal class GameSessionTest {
 
     private lateinit var player1: SessionPlayer
@@ -116,7 +117,7 @@ internal class GameSessionTest {
         val currentPlayer = if (oldStatus == GameSessionStatus.Player_1_Turn) player1 else player2
         // skip turn
         messages.clear()
-        newGame.play(currentPlayer.sessionId, currentPlayer.cards.keys.first(), "wherever")
+        newGame.play(currentPlayer.sessionId, currentPlayer.findCardByName(FIRE_BALL_NAME)?.id, "wherever")
         val gameUpdate = messages.last() as? GameMessageUpdate
         assertEquals("Target not found!", gameUpdate?.message)
     }
@@ -127,7 +128,7 @@ internal class GameSessionTest {
         newGame.status = GameSessionStatus.Player_1_Turn
         // skip turn
         messages.clear()
-        newGame.play(player1.sessionId, "healing_julia")
+        newGame.play(player1.sessionId, player1.findCardByName(HEALING_NAME)?.id)
         val playerUpdate = messages.last() as? GameMessageUpdate
         assertEquals("Health is already full", playerUpdate?.message)
     }
@@ -137,10 +138,11 @@ internal class GameSessionTest {
         newGame.startGame()
         newGame.status = GameSessionStatus.Player_2_Turn
         messages.clear()
-        newGame.play(player2.sessionId, "fireball_daniil")
+        val fireballId = player2.findCardByName(FIRE_BALL_NAME)?.id
+        newGame.play(player2.sessionId, fireballId)
         assertEquals(95, player1.getProperty(PROP_HEALTH))
         val cardPlayed = messages.last() as? CardPlayed
-        assertEquals("fireball_daniil", cardPlayed?.cardId)
+        assertEquals(fireballId, cardPlayed?.cardId)
         assertEquals(true, cardPlayed?.discarded)
     }
 
@@ -149,14 +151,15 @@ internal class GameSessionTest {
         newGame.startGame()
         newGame.status = GameSessionStatus.Player_1_Turn
         player1.changeProperty(PROP_HEALTH, -50)
-        newGame.play(player1.sessionId, "healing_julia")
+        val healingId = player1.findCardByName(HEALING_NAME)?.id
+        newGame.play(player1.sessionId, healingId)
         newGame.play(player1.sessionId) //end turn
         newGame.play(player2.sessionId) //end turn
         newGame.play(player1.sessionId) //end turn
 
         assertEquals(52, player1.getProperty(PROP_HEALTH))
         assertNotNull(
-            messages.find { it is CardPlayed && it.cardId == "healing_julia" && it.discarded },
+            messages.find { it is CardPlayed && it.cardId == healingId && it.discarded },
             "Card did not expire"
         )
     }
@@ -165,7 +168,7 @@ internal class GameSessionTest {
     fun `play - play a card with temporary property change effect`() {
         newGame.startGame()
         newGame.status = GameSessionStatus.Player_1_Turn
-        newGame.play(player1.sessionId, "iceShield_julia")
+        newGame.play(player1.sessionId, player1.findCardByName(ICE_SHIELD_NAME)?.id)
         assertEquals(15, player1.getProperty(PROP_COLD_RESIST))
         newGame.play(player1.sessionId) //end turn 1
         newGame.play(player2.sessionId) //end turn 1
@@ -178,7 +181,7 @@ internal class GameSessionTest {
     fun `play - play a card with temporary property change effect update each turn`() {
         newGame.startGame()
         newGame.status = GameSessionStatus.Player_1_Turn
-        newGame.play(player1.sessionId, "fireShield_julia")
+        newGame.play(player1.sessionId, player1.findCardByName(FIRE_SHIELD_NAME)?.id)
         // no immediate change
         assertEquals(0, player1.getProperty(PROP_FIRE_RESIST))
         newGame.play(player1.sessionId) //end turn 1 for player 1
@@ -197,4 +200,5 @@ internal class GameSessionTest {
         assertEquals(0, player1.getProperty(PROP_FIRE_RESIST))
 
     }
+    
 }
