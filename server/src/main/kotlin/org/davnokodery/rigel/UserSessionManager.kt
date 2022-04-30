@@ -3,8 +3,10 @@ package org.davnokodery.rigel
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import org.davnokodery.rigel.model.GameSession
+import org.davnokodery.rigel.model.GameSessionStatus
 import org.davnokodery.rigel.model.SessionPlayer
 import org.slf4j.LoggerFactory
+import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
 import org.springframework.web.socket.CloseStatus
@@ -22,6 +24,10 @@ data class UserSession(
 fun interface MessageSender {
     fun send(message: ServerWsMessage)
 }
+
+private const val WS_ID_TAG = "WID"
+private const val USER_ID_TAG = "UID"
+private const val GAME_ID_TAG = "GID"
 
 @Component
 class UserSessionManager(
@@ -47,142 +53,160 @@ class UserSessionManager(
 
     override fun handleTextMessage(session: WebSocketSession, message: TextMessage) {
         try {
-            logger.debug("Received message from ${session.id}: ${message.payload}")
+            MDC.put(WS_ID_TAG, session.id)
+            logger.debug("Received message: ${message.payload}")
             val userSession = sessions[session.id]
             if (userSession == null) {
-                logger.error("Received message before connection is established!")
+                logger.error("Received message before connection is established")
                 session.close()
                 return
             }
+            MDC.put(USER_ID_TAG, userSession.user?.name)
 
-            val request: ClientWsMessage = try {
-                mapper.readValue(message.payload)
-            } catch (e: Exception) {
-                logger.error("Could not parse message from session=${session.id}, message='${message.payload}'", e)
-                session.close()
-                return
-            }
-
-            when (request) {
-                is JwtMessage -> {
-                    // check user authentication
-                    if (userSession.user == null) {
-                        try {
-                            val user = authService.validateToken(request.jwt)
-                            userSession.user = user
-    
-                            // drop other active sessions for the same user
-                            sessions.values.forEach {
-                                if (it.user != null
-                                    && it.user?.name == user.name
-                                    && it.session.id != userSession.session.id
-                                ) {
-                                    logger.debug("Dropping existing session ${it.session.id} for user ${user.name}")
-                                    it.session.close()
-                                }
-                            }
-                        } catch (e: Exception) {
-                            logger.error("Could not prove login: ", e)
-                            session.close()
-                            return
-                        }
-                    } else {
-                        logger.warn("Unexpected JwtMessage for user: ${session.id}")
-                    }
-                }
-                is CreateGameMessage -> {
-                    // todo: check that there is no running game
-                    // create new game
-                    val gameId = UUID.randomUUID().toString()
-                    val newGameSession = GameSession(
-                        id = gameId,
-                        player1 = SessionPlayer(
-                            sessionId = session.id,
-                            name = userSession.user!!.name,
-                            sender = {
-                                userSession.session.sendMessage(toJson(it))
-                            }),
-                        sender = {
-                            val gameSession = games[gameId]!!
-                            // broadcast message
-                            when {
-                                it is GameStatusUpdate
-                                        || it is CardPlayed
-                                        || it is GameMessageUpdate && it.playerSessionId == null -> {
-                                    sessions[gameSession.player1.sessionId]?.session?.sendMessage(toJson(it))
-                                    sessions[gameSession.player2!!.sessionId]?.session?.sendMessage(toJson(it))
-                                }
-                                it is PlayerPropertyChange -> {
-                                    // unicast message
-                                    sessions[it.playerSessionId]?.session?.sendMessage(toJson(it))
-                                }
-                                it is GameMessageUpdate && it.playerSessionId != null -> {
-                                    // unicast message
-                                    sessions[it.playerSessionId]?.session?.sendMessage(toJson(it))
-                                }
-                            }
-                        },
-                        gameRules = provingGroundsRules() // todo: make configurable
-                    )
-                    games[gameId] = newGameSession
-                    logger.debug("Created new game $gameId")
-                    sessions.values.forEach {
-                        it.session.sendMessage(toJson(NewGameCreated(gameId)))
-                    }
-    
-                }
-                is StartGameMessage -> {
-                    val gameSession = findGameByPlayerId(session.id)
-                    if (gameSession == null) {
-                        logger.warn("No such game") // todo: send error response
-                        return
-                    }
-                    if (gameSession.player2 != null) {
-                        // todo: check if game is not started yet
-                        gameSession.startGame()
-                        logger.debug("Game started ${gameSession.id}")
-                    } else {
-                        session.sendMessage(toJson(GameMessageUpdate("Not enough players")))
-                    }
-    
-                }
-                is JoinGameMessage -> {
-                    val gameSession = games[request.gameId]
-                    if (gameSession == null) {
-                        logger.warn("No such game") // todo: send error response
-                        return
-                    }
-                    if (gameSession.player2 == null) {
-                        gameSession.player2 = SessionPlayer(
-                            sessionId = session.id,
-                            name = userSession.user!!.name,
-                            sender = {
-                                userSession.session.sendMessage(TextMessage(mapper.writeValueAsString(it)))
-                            }
-                        )
-                        logger.debug("Joined player: ${userSession.user!!.name}, game id: ${gameSession.id}")
-                    } else {
-                        session.sendMessage(toJson(GameMessageUpdate("Game is full")))
-                    }
-                }
-                is PlayCardMessage -> {
-                    val gameSession = findGameByPlayerId(session.id)
-                    if (gameSession == null) {
-                        logger.warn("No such game") // todo: send error response
-                        return
-                    }
-                    gameSession.play(session.id, request.cardId, request.targetId)
-                    logger.debug("Played card: ${request.cardId}, target: ${request.targetId}, user: ${userSession.user!!.name}")
-                }
+            when (val request: ClientWsMessage = mapper.readValue(message.payload)) {
+                is JwtMessage -> validateJwtAuth(session, request, userSession)
+                is CreateGameMessage -> createGameSession(session, userSession)
+                is StartGameMessage -> startGameSession(session)
+                is JoinGameMessage -> joinGameSession(session, request, userSession)
+                is PlayCardMessage -> playCard(session, request)
                 is GameListRequest -> {
                     userSession.session.sendMessage(toJson(GamesListResponse(games.keys.toList())))
                 }
                 is SkipTurnMessage -> TODO()
             }
         } catch (e: Exception) {
-            logger.error("Could not process message for session=${session.id}, message='${message.payload}'", e)
+            logger.error("Could not process message: '${message.payload}'", e)
             session.close()
+        } finally {
+            MDC.clear()
+        }
+    }
+
+    private fun playCard(session: WebSocketSession, request: PlayCardMessage) {
+        val gameSession = findGameByPlayerId(session.id)
+        if (gameSession == null) {
+            logger.warn("Not in game")
+            session.sendMessage(toJson(GameMessageUpdate("Not in game")))
             return
+        }
+        MDC.put(GAME_ID_TAG, gameSession.id)
+        gameSession.play(session.id, request.cardId, request.targetId)
+        logger.debug("Played card: ${request.cardId}, target: ${request.targetId}")
+    }
+
+    private fun joinGameSession(session: WebSocketSession, request: JoinGameMessage, userSession: UserSession) {
+        val gameSession = games[request.gameId]
+        if (gameSession == null) {
+            logger.warn("No such game ${request.gameId}")
+            session.sendMessage(toJson(GameMessageUpdate("No such game ${request.gameId}")))
+            return
+        }
+        MDC.put(GAME_ID_TAG, gameSession.id)
+        if (gameSession.player2 == null) {
+            gameSession.player2 = SessionPlayer(
+                sessionId = session.id,
+                name = userSession.user!!.name,
+                sender = {
+                    userSession.session.sendMessage(TextMessage(mapper.writeValueAsString(it)))
+                }
+            )
+            logger.debug("Joined")
+        } else {
+            logger.debug("Game is full")
+            session.sendMessage(toJson(GameMessageUpdate("Game is full")))
+        }
+    }
+
+    /**
+     * Start a game session that was previously created
+     */
+    private fun startGameSession(session: WebSocketSession) {
+        val gameSession = findGameByPlayerId(session.id)
+        if (gameSession == null) {
+            logger.warn("No game created")
+            session.sendMessage(toJson(GameMessageUpdate("No game created")))
+            return
+        }
+        MDC.put(GAME_ID_TAG, gameSession.id)
+        if (gameSession.player2 != null) {
+            if (gameSession.status == GameSessionStatus.Created) {
+                gameSession.startGame()
+                logger.debug("Game started")
+            } else {
+                logger.warn("Game not in Created state ${gameSession.status}")
+                session.sendMessage(toJson(GameMessageUpdate("Game not in Created state")))
+            }
+        } else {
+            logger.debug("Not enough players")
+            session.sendMessage(toJson(GameMessageUpdate("Not enough players")))
+        }
+        return
+    }
+
+    /**
+     * Create a new game session
+     * todo: check that there is no running game with this user
+     */
+    private fun createGameSession(session: WebSocketSession, userSession: UserSession) {
+        val gameId = UUID.randomUUID().toString()
+        val newGameSession = GameSession(
+            id = gameId,
+            player1 = SessionPlayer(
+                sessionId = session.id,
+                name = userSession.user!!.name,
+                sender = {
+                    userSession.session.sendMessage(toJson(it))
+                }),
+            sender = {
+                val gameSession = games[gameId]!!
+                // broadcast message
+                when {
+                    it is GameStatusUpdate
+                            || it is CardPlayed
+                            || it is GameMessageUpdate && it.playerSessionId == null -> {
+                        sessions[gameSession.player1.sessionId]?.session?.sendMessage(toJson(it))
+                        sessions[gameSession.player2!!.sessionId]?.session?.sendMessage(toJson(it))
+                    }
+                    it is PlayerPropertyChange -> {
+                        // unicast message
+                        sessions[it.playerSessionId]?.session?.sendMessage(toJson(it))
+                    }
+                    it is GameMessageUpdate && it.playerSessionId != null -> {
+                        // unicast message
+                        sessions[it.playerSessionId]?.session?.sendMessage(toJson(it))
+                    }
+                }
+            },
+            gameRules = provingGroundsRules() // todo: make configurable
+        )
+        games[gameId] = newGameSession
+        MDC.put(GAME_ID_TAG, gameId)
+        logger.debug("Created new game")
+        sessions.values.forEach {
+            it.session.sendMessage(toJson(NewGameCreated(gameId)))
+        }
+    }
+
+    /**
+     * Validate jwt message and initialize the websocket connection. Disconnect for any problem.
+     */
+    private fun validateJwtAuth(session: WebSocketSession, request: JwtMessage, userSession: UserSession) {
+        if (userSession.user == null) {
+            val user = authService.validateToken(request.jwt)
+            userSession.user = user
+            MDC.put(USER_ID_TAG, user.name)
+            // drop other active sessions for the same user
+            sessions.values.forEach {
+                if (it.user != null
+                    && it.user?.name == user.name
+                    && it.session.id != userSession.session.id
+                ) {
+                    logger.debug("Dropping existing session ${it.session.id}")
+                    it.session.close()
+                }
+            }
+        } else {
+            logger.warn("Unexpected JwtMessage")
         }
     }
 
