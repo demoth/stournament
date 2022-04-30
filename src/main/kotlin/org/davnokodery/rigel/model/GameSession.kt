@@ -1,6 +1,9 @@
 package org.davnokodery.rigel.model
 
-import org.davnokodery.rigel.*
+import org.davnokodery.rigel.GameMessageUpdate
+import org.davnokodery.rigel.GameStatusUpdate
+import org.davnokodery.rigel.MessageSender
+import org.davnokodery.rigel.ServerWsMessage
 import org.slf4j.LoggerFactory
 import java.util.*
 
@@ -49,7 +52,7 @@ data class GameSession(
     val player1: SessionPlayer,
     internal val sender: MessageSender,
     internal val gameRules: GameRules,
-    internal var status: GameSessionStatus = GameSessionStatus.Created
+    var status: GameSessionStatus = GameSessionStatus.Created
 ) {
     private val logger = LoggerFactory.getLogger(GameSession::class.java)
 
@@ -59,7 +62,7 @@ data class GameSession(
         sender.send(update)
     }
 
-    private fun changeStatus(newState: GameSessionStatus) {
+    fun changeStatus(newState: GameSessionStatus) {
         status = newState
         send(GameStatusUpdate(newState))
     }
@@ -150,7 +153,6 @@ data class GameSession(
                 currentPlayer.removeEffect(it.id)
             }
             gameRules.onEndTurn(currentPlayer, enemyPlayer, this)
-            changeStatus(if (status == GameSessionStatus.Player_1_Turn) GameSessionStatus.Player_2_Turn else GameSessionStatus.Player_1_Turn)
         }
     }
 

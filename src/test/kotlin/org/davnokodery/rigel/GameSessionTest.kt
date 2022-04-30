@@ -2,7 +2,9 @@ package org.davnokodery.rigel
 
 import org.davnokodery.rigel.TestDataCreator.Companion.testUser1
 import org.davnokodery.rigel.TestDataCreator.Companion.testUser2
-import org.davnokodery.rigel.model.*
+import org.davnokodery.rigel.model.GameSession
+import org.davnokodery.rigel.model.GameSessionStatus
+import org.davnokodery.rigel.model.SessionPlayer
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
@@ -117,7 +119,7 @@ internal class GameSessionTest {
         val currentPlayer = if (oldStatus == GameSessionStatus.Player_1_Turn) player1 else player2
         // skip turn
         messages.clear()
-        newGame.play(currentPlayer.sessionId, currentPlayer.findCardByName(FIRE_BALL_NAME)?.id, "wherever")
+        newGame.play(currentPlayer.sessionId, currentPlayer.findCardByName(FIRE_BALL_NAME).id, "wherever")
         val gameUpdate = messages.last() as? GameMessageUpdate
         assertEquals("Target not found!", gameUpdate?.message)
     }
@@ -128,7 +130,7 @@ internal class GameSessionTest {
         newGame.status = GameSessionStatus.Player_1_Turn
         // skip turn
         messages.clear()
-        newGame.play(player1.sessionId, player1.findCardByName(HEALING_NAME)?.id)
+        newGame.play(player1.sessionId, player1.findCardByName(HEALING_NAME).id)
         val playerUpdate = messages.last() as? GameMessageUpdate
         assertEquals("Health is already full", playerUpdate?.message)
     }
@@ -138,7 +140,7 @@ internal class GameSessionTest {
         newGame.startGame()
         newGame.status = GameSessionStatus.Player_2_Turn
         messages.clear()
-        val fireballId = player2.findCardByName(FIRE_BALL_NAME)?.id
+        val fireballId = player2.findCardByName(FIRE_BALL_NAME).id
         newGame.play(player2.sessionId, fireballId)
         assertEquals(95, player1.getProperty(PROP_HEALTH))
         val cardPlayed = messages.last() as? CardPlayed
@@ -147,11 +149,24 @@ internal class GameSessionTest {
     }
 
     @Test
+    fun `play - win a game`() {
+        newGame.startGame()
+        newGame.status = GameSessionStatus.Player_2_Turn
+        player2.addCard(createDeathRayCard())
+        val deathRay = player2.findCardByName(DEATH_RAY).id
+        newGame.play(player2.sessionId, deathRay)
+        // end turn
+        newGame.play(player2.sessionId)
+
+        assertEquals(GameSessionStatus.Player_2_Won, newGame.status)
+    }
+
+    @Test
     fun `play - play a card with lasting effect`() {
         newGame.startGame()
         newGame.status = GameSessionStatus.Player_1_Turn
         player1.changeProperty(PROP_HEALTH, -50)
-        val healingId = player1.findCardByName(HEALING_NAME)?.id
+        val healingId = player1.findCardByName(HEALING_NAME).id
         newGame.play(player1.sessionId, healingId)
         newGame.play(player1.sessionId) //end turn
         newGame.play(player2.sessionId) //end turn
@@ -168,7 +183,7 @@ internal class GameSessionTest {
     fun `play - play a card with temporary property change effect`() {
         newGame.startGame()
         newGame.status = GameSessionStatus.Player_1_Turn
-        newGame.play(player1.sessionId, player1.findCardByName(ICE_SHIELD_NAME)?.id)
+        newGame.play(player1.sessionId, player1.findCardByName(ICE_SHIELD_NAME).id)
         assertEquals(15, player1.getProperty(PROP_COLD_RESIST))
         newGame.play(player1.sessionId) //end turn 1
         newGame.play(player2.sessionId) //end turn 1
@@ -181,7 +196,7 @@ internal class GameSessionTest {
     fun `play - play a card with temporary property change effect update each turn`() {
         newGame.startGame()
         newGame.status = GameSessionStatus.Player_1_Turn
-        newGame.play(player1.sessionId, player1.findCardByName(FIRE_SHIELD_NAME)?.id)
+        newGame.play(player1.sessionId, player1.findCardByName(FIRE_SHIELD_NAME).id)
         // no immediate change
         assertEquals(0, player1.getProperty(PROP_FIRE_RESIST))
         newGame.play(player1.sessionId) //end turn 1 for player 1

@@ -73,10 +73,19 @@ data class SessionPlayer(
         }
     }
 
-    fun findCardByName(name: String) = cards.values.find { it.name == name }
+    /**
+     * throws an NoSuchElementException if not found. Used in tests
+     */
+    fun findCardByName(name: String) = cards.values.first { it.name == name }
 
+    /**
+     * returns null if not found
+     */
     fun findCardById(id: String) = cards.values.find { it.id == id }
 
+    /**
+     * returns null if not found
+     */
     fun findEffectById(id: String) = effects.values.find { it.id == id }
 
     fun updateEffects(currentPlayer: SessionPlayer, enemyPlayer: SessionPlayer) = effects.values.filter {

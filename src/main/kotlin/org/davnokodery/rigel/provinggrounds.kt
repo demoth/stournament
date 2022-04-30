@@ -1,6 +1,10 @@
 package org.davnokodery.rigel
 
-import org.davnokodery.rigel.model.*
+import org.davnokodery.rigel.model.Card
+import org.davnokodery.rigel.model.GameRules
+import org.davnokodery.rigel.model.GameSession
+import org.davnokodery.rigel.model.GameSessionStatus.*
+import org.davnokodery.rigel.model.SessionPlayer
 import kotlin.random.Random
 
 // Test game logic, a.k.a Proving Grounds
@@ -13,8 +17,9 @@ const val PROP_FIRE_RESIST = "resist_fire"
 // card names
 const val FIRE_BALL_NAME = "fireball"
 const val HEALING_NAME = "healing"
-const val FIRE_SHIELD_NAME = "fireShield"
-const val ICE_SHIELD_NAME = "iceShield"
+const val FIRE_SHIELD_NAME = "fire_shield"
+const val ICE_SHIELD_NAME = "ice_shield"
+const val DEATH_RAY = "death_ray"
 
 fun provingGroundsRules(): GameRules {
     return object : GameRules {
@@ -56,13 +61,27 @@ fun provingGroundsRules(): GameRules {
         }
 
         override fun onEndTurn(player: SessionPlayer, enemyPlayer: SessionPlayer, gameSession: GameSession) {
-            val newCard = when (Random.nextInt(3)) {
-                0 -> createFireShieldCard()
-                1 -> createIceShieldCard()
-                2 -> createHealingCard()
-                else -> createFireballCard()
+            // check if game is finished
+            val status = gameSession.status
+            check(status == Player_1_Turn || status == Player_2_Turn) { "Unexpected game state: $status" }
+            if (enemyPlayer.getProperty(PROP_HEALTH) <= 0) {
+                // current player won
+                gameSession.changeStatus(if (status == Player_1_Turn) Player_1_Won else Player_2_Won)
+            } else if (player.getProperty(PROP_HEALTH) <= 0) {
+                // enemy player won
+                gameSession.changeStatus(if (status == Player_2_Turn) Player_1_Won else Player_2_Won)
+            } else {
+                // deal a new card
+                val newCard = when (Random.nextInt(3)) {
+                    0 -> createFireShieldCard()
+                    1 -> createIceShieldCard()
+                    2 -> createHealingCard()
+                    else -> createFireballCard()
+                }
+                player.addCard(newCard)
+
+                gameSession.changeStatus(if (status == Player_1_Turn) Player_2_Turn else Player_1_Turn)
             }
-            player.addCard(newCard)  
         }
     }
 }
@@ -114,4 +133,12 @@ private fun createFireShieldCard() = Card(
     ttl = 3,
     onTick = { c, p, _ ->
         p.changePropertyTemporary(PROP_FIRE_RESIST, c.ttl * 10, c.id)
+    })
+
+fun createDeathRayCard() = Card(
+    name = DEATH_RAY,
+    iconName = DEATH_RAY,
+    description = DEATH_RAY,
+    onApply = { _, _, e, _ ->
+        e.changeProperty(PROP_HEALTH, -200)
     })
