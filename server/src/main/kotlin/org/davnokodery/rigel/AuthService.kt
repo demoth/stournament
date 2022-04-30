@@ -3,11 +3,10 @@ package org.davnokodery.rigel
 import com.auth0.jwt.JWT
 import com.auth0.jwt.JWTVerifier
 import com.auth0.jwt.algorithms.Algorithm
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Service;
-
-import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.http.HttpStatus
+import org.springframework.stereotype.Service
+import java.util.*
 
 @Service
 class AuthService(@Autowired private val userRepository: UserRepository) {

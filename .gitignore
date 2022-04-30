@@ -37,4 +37,4 @@ out/
 .vscode/
 
 ### TODO create a storage with proper licensing
-src/main/resources/static
+server/src/main/resources/static
