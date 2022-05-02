@@ -21,7 +21,7 @@ class LoginIntegrationTest {
     private var restTemplate = TestRestTemplate()
 
     private val url
-        get() = "http://localhost:$port"
+        get() = "http://localhost:$port/user"
 
     @Test
     fun `login - not successful`() {
