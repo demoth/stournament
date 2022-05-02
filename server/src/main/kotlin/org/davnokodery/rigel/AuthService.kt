@@ -10,8 +10,6 @@ import java.util.*
 
 @Service
 class AuthService(@Autowired private val userRepository: UserRepository) {
-    private val CLAIM_NAME = "loggedInAs"
-
     private val ISSUER = "rigel"
 
     private val JWT_SECRET = System.getenv("JWT_SECRET") ?: UUID.randomUUID().toString()
@@ -26,7 +24,7 @@ class AuthService(@Autowired private val userRepository: UserRepository) {
         if (type != "Bearer")
             throw GameException("Authentication $type is not supported", HttpStatus.BAD_REQUEST)
         val userName: String = try {
-            VERIFIER.verify(token).getClaim(CLAIM_NAME).asString()
+            VERIFIER.verify(token).subject
         } catch (e: Exception) {
             throw GameException("Invalid token", HttpStatus.UNAUTHORIZED)
         }
@@ -50,7 +48,7 @@ class AuthService(@Autowired private val userRepository: UserRepository) {
         try {
             return LoginResponse(JWT.create()
                 .withIssuer(ISSUER)
-                .withClaim(CLAIM_NAME, user.name)
+                .withSubject(user.name)
                 .sign(Algorithm.HMAC256(JWT_SECRET)))
         } catch (e: Exception) {
             throw GameException("Could not authenticate", HttpStatus.INTERNAL_SERVER_ERROR)
