@@ -17,7 +17,15 @@ internal class GameSessionTest {
     private lateinit var player2: SessionPlayer
     private lateinit var newGame: GameSession
     private val messages = mutableListOf<ServerWsMessage>()
-    private val sender = MessageSender { messages.add(it) }
+    private val sender = object: MessageSender {
+        override fun unicast(message: ServerWsMessage, receiver: String) {
+            messages.add(message)
+        }
+
+        override fun broadcast(message: ServerWsMessage) {
+            messages.add(message)
+        }
+    }
     
     @BeforeEach
     fun setup() {

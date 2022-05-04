@@ -21,8 +21,10 @@ data class UserSession(
     var user: User? = null
 )
 
-fun interface MessageSender {
-    fun send(message: ServerWsMessage)
+interface MessageSender {
+    fun unicast(message: ServerWsMessage, receiver: String)
+
+    fun broadcast(message: ServerWsMessage)
 }
 
 private const val WS_ID_TAG = "WID"
@@ -106,9 +108,7 @@ class UserSessionManager(
             gameSession.player2 = SessionPlayer(
                 sessionId = session.id,
                 name = userSession.user!!.name,
-                sender = {
-                    userSession.session.sendMessage(TextMessage(mapper.writeValueAsString(it)))
-                }
+                sender = createMessageSender(gameSession.id)
             )
             logger.debug("Joined")
         } else {
@@ -154,29 +154,8 @@ class UserSessionManager(
             player1 = SessionPlayer(
                 sessionId = session.id,
                 name = userSession.user!!.name,
-                sender = {
-                    userSession.session.sendMessage(toJson(it))
-                }),
-            sender = {
-                val gameSession = games[gameId]!!
-                // broadcast message
-                when {
-                    it is GameStatusUpdate
-                            || it is CardPlayed
-                            || it is GameMessageUpdate && it.playerSessionId == null -> {
-                        sessions[gameSession.player1.sessionId]?.session?.sendMessage(toJson(it))
-                        sessions[gameSession.player2!!.sessionId]?.session?.sendMessage(toJson(it))
-                    }
-                    it is PlayerPropertyChange -> {
-                        // unicast message
-                        sessions[it.playerSessionId]?.session?.sendMessage(toJson(it))
-                    }
-                    it is GameMessageUpdate && it.playerSessionId != null -> {
-                        // unicast message
-                        sessions[it.playerSessionId]?.session?.sendMessage(toJson(it))
-                    }
-                }
-            },
+                sender = createMessageSender(gameId)),
+            sender = createMessageSender(gameId),
             gameRules = provingGroundsRules() // todo: make configurable
         )
         games[gameId] = newGameSession
@@ -184,6 +163,21 @@ class UserSessionManager(
         logger.debug("Created new game")
         sessions.values.forEach {
             it.session.sendMessage(toJson(NewGameCreated(gameId)))
+        }
+    }
+
+    private fun createMessageSender(gameId: String): MessageSender {
+        return object: MessageSender {
+            override fun unicast(message: ServerWsMessage, receiver: String) {
+                sessions[receiver]?.session?.sendMessage(toJson(message))
+            }
+
+            override fun broadcast(message: ServerWsMessage) {
+                val gameSession = games[gameId]
+                check(gameSession != null) { "Game session does not exist $gameId" }
+                sessions[gameSession.player1.sessionId]?.session?.sendMessage(toJson(message))
+                sessions[gameSession.player2?.sessionId]?.session?.sendMessage(toJson(message))
+            }
         }
     }
 

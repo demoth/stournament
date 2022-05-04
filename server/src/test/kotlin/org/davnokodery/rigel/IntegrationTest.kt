@@ -100,6 +100,7 @@ class IntegrationTest(
         tester1.startGame()
         
         check(tester1.currentGameStatus != null) { "Not received the state yet" }
+        check(tester2.currentGameStatus != null) { "Not received the state yet" }
         val currentPlayer = if (tester1.currentGameStatus == Player_1_Turn) tester1 else tester2
         val opponent = if (tester1.currentGameStatus != Player_1_Turn) tester1 else tester2
         

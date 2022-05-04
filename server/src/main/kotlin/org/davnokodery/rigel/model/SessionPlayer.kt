@@ -18,7 +18,7 @@ data class SessionPlayer(
     fun addCard(card: Card) {
         check(!cards.contains(card.id)) { "Player already has a card with id ${card.id}" }
         cards[card.id] = card
-        sender.send(NewCard(card.toCardData()))
+        sender.unicast(NewCard(card.toCardData()), sessionId) // todo: make opponent know
     }
 
     fun getProperty(property: String): Int {
@@ -29,7 +29,7 @@ data class SessionPlayer(
         val oldValue = properties[property] ?: 0
         properties[property] = oldValue + delta
         // todo need to calculate new values for health or mana and broadcast them
-        sender.send(PlayerPropertyChange(sessionId, property, delta))
+        sendPropertyUpdate(PlayerPropertyChange(property, delta))
     }
 
     /**
@@ -39,11 +39,12 @@ data class SessionPlayer(
         propertyChanges.forEach { (property, changes) ->
             val oldDelta = changes.remove(id)
             if (oldDelta != null) {
-                sender.send(PlayerPropertyChange(sessionId, property, -oldDelta))
+                sendPropertyUpdate(PlayerPropertyChange(property, -oldDelta))
             }
         }
     }
 
+    private fun sendPropertyUpdate(msg: PlayerPropertyChange) = sender.unicast(msg, sessionId)
     fun changePropertyTemporary(property: String, delta: Int, cardId: String) {
         val changes = propertyChanges[property]
 
@@ -53,12 +54,12 @@ data class SessionPlayer(
             // notify that old change has expired
             val oldDelta = changes[cardId]
             if (oldDelta != null)
-                sender.send(PlayerPropertyChange(sessionId, property, -oldDelta))
+                sendPropertyUpdate(PlayerPropertyChange(property, -oldDelta))
             changes[cardId] = delta
         }
 
-        // todo need to calculate new values for health or mana and broadcast them
-        sender.send(PlayerPropertyChange(sessionId, property, delta))
+        // todo need to calculate new values
+        sendPropertyUpdate(PlayerPropertyChange(property, delta))
     }
 
     fun cardPlayed(card: Card) {
@@ -66,10 +67,10 @@ data class SessionPlayer(
         if (card.ttl > 0) {
             // if a card has a lasting effect -> move it to the current effects
             effects[card.id] = card
-            sender.send(CardPlayed(card.id, false))
+            sender.broadcast(CardPlayed(card.id, false)) //todo: reveal when played
         } else {
             // discard otherwise
-            sender.send(CardPlayed(card.id, true))
+            sender.broadcast(CardPlayed(card.id, true))
         }
     }
 
@@ -101,6 +102,6 @@ data class SessionPlayer(
 
     fun removeEffect(id: String) {
         effects.remove(id)
-        sender.send(CardPlayed(id, true))
+        sender.broadcast(CardPlayed(id, true))
     }
 }

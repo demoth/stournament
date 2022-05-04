@@ -32,11 +32,8 @@ sealed class ServerWsMessage(
 data class GameStatusUpdate(val newStatus: GameSessionStatus) : ServerWsMessage()
 data class CardPlayed(val cardId: String, val discarded: Boolean) : ServerWsMessage()
 data class NewGameCreated(val gameId: String) : ServerWsMessage()
-
-// targeted
-// fixme: don't send session id
-data class GameMessageUpdate(val message: String, val playerSessionId: String? = null) : ServerWsMessage()
-data class PlayerPropertyChange(val playerSessionId: String, val property: String, val delta: Int) : ServerWsMessage()
+data class GameMessageUpdate(val message: String) : ServerWsMessage()
+data class PlayerPropertyChange(val property: String, val delta: Int) : ServerWsMessage()
 data class GamesListResponse(val games: Collection<String>) : ServerWsMessage()
 data class NewCard(val cardData: CardData) : ServerWsMessage()
 

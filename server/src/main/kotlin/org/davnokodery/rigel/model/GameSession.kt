@@ -3,7 +3,6 @@ package org.davnokodery.rigel.model
 import org.davnokodery.rigel.GameMessageUpdate
 import org.davnokodery.rigel.GameStatusUpdate
 import org.davnokodery.rigel.MessageSender
-import org.davnokodery.rigel.ServerWsMessage
 import org.slf4j.LoggerFactory
 import java.util.*
 
@@ -58,13 +57,9 @@ data class GameSession(
 
     var player2: SessionPlayer? = null
 
-    private fun send(update: ServerWsMessage) {
-        sender.send(update)
-    }
-
     fun changeStatus(newState: GameSessionStatus) {
         status = newState
-        send(GameStatusUpdate(newState))
+        sender.broadcast(GameStatusUpdate(newState))
     }
 
     fun startGame() {
@@ -86,12 +81,12 @@ data class GameSession(
      */
     fun play(playerSessionId: String, cardId: String? = null, target: String? = null) {
         if (status == GameSessionStatus.Created) {
-            send(GameMessageUpdate("Game is not started yet"))
+            sender.unicast(GameMessageUpdate("Game is not started yet"), playerSessionId)
             return
         }
 
         if (status == GameSessionStatus.Player_1_Won || status == GameSessionStatus.Player_2_Won) {
-            send(GameMessageUpdate("Game is finished, start a new game"))
+            sender.unicast(GameMessageUpdate("Game is finished, start a new game"), playerSessionId)
             return
         }
 
@@ -109,7 +104,7 @@ data class GameSession(
         val enemyPlayer = if (status == GameSessionStatus.Player_2_Turn) player1 else secondPlayer
 
         if (playerSessionId != currentPlayer.sessionId) {
-            send(GameMessageUpdate("It is ${currentPlayer.name}'s turn!", playerSessionId))
+            sender.unicast(GameMessageUpdate("It is ${currentPlayer.name}'s turn!"), playerSessionId)
             return
         }
 
@@ -118,7 +113,7 @@ data class GameSession(
             // selected card or effect exists
             val card = currentPlayer.findCardById(cardId) ?: currentPlayer.findEffectById(cardId)
             if (card == null) {
-                send(GameMessageUpdate("Error! No such card!", currentPlayer.sessionId))
+                sender.unicast(GameMessageUpdate("Error! No such card!"), playerSessionId)
                 return
             }
 
@@ -127,13 +122,13 @@ data class GameSession(
             } else null
 
             if (target != null && targetEffect == null) {
-                send(GameMessageUpdate("Target not found!", currentPlayer.sessionId))
+                sender.unicast(GameMessageUpdate("Target not found!"), playerSessionId)
                 return
             }
 
             val cardError = card.validator?.validate(card, currentPlayer, enemyPlayer, targetEffect)
             if (cardError != null) {
-                send(GameMessageUpdate(cardError, currentPlayer.sessionId))
+                sender.unicast(GameMessageUpdate(cardError), playerSessionId)
                 return
             }
 
