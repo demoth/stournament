@@ -175,20 +175,21 @@ class IntegrationTest(
     private val url
         get() = "localhost:$port"
 
-    private fun loginPost(user: User): String {
+    private fun loginPost(user: User): LoginResponse {
         val loginResponse = restTemplate.postForEntity<LoginResponse>(
             "http://$url/login",
             LoginRequest(user.name, user.password)
         )
         assertEquals(HttpStatus.OK, loginResponse.statusCode, "Could not login")
-        return loginResponse.body!!.jwt
+        return loginResponse.body!!
     }
 
     private fun toJson(msg: ClientWsMessage) = TextMessage(mapper.writeValueAsString(msg))
 
-    inner class TestClient(private val jwt: String) : WebSocketHandler {
+    inner class TestClient(private val loginDetails: LoginResponse) : WebSocketHandler {
         private val mapper = jacksonObjectMapper()
         private val session = StandardWebSocketClient().doHandshake(this, "ws://$url/web-socket").get()!!
+        private val username = loginDetails.username
 
         val gameIds = hashSetOf<String>()
         var currentGameStatus: GameSessionStatus? = null
@@ -201,7 +202,7 @@ class IntegrationTest(
 
         suspend fun login() {
             check(connected) { "Not connected!" }
-            session.sendMessage(TextMessage(mapper.writeValueAsString(JwtMessage("Bearer $jwt"))))
+            session.sendMessage(TextMessage(mapper.writeValueAsString(JwtMessage("Bearer ${loginDetails.jwt}"))))
             delay(200)
         }
 
@@ -248,17 +249,19 @@ class IntegrationTest(
             }
 
             val msg: ServerWsMessage = mapper.readValue(message.payload)
-            logger.debug("Received (${session.id}): $msg")
+            logger.debug("Received ($username, ${session.id}): $msg")
             when (msg) {
                 is NewGameCreated -> gameIds.add(msg.gameId)
                 is GameMessageUpdate -> messages.add(msg)
                 is GameStatusUpdate -> currentGameStatus = msg.newStatus
                 is GamesListResponse -> gameIds.addAll(msg.games)
                 is PlayerPropertyChange -> {
-                    // check that we track the proper value - all our deltas constitute the final value
-                    assertEquals(msg.finalValue, (properties[msg.property] ?: 0) + msg.delta)
+                    if (msg.username == username) {
+                        // check that we track the proper value - all our deltas constitute the final value
+                        assertEquals(msg.finalValue, (properties[msg.property] ?: 0) + msg.delta)
 
-                    properties[msg.property] = msg.finalValue
+                        properties[msg.property] = msg.finalValue
+                    }
                 }
                 is NewCard -> cards[msg.cardData.id] = msg.cardData
                 is CardPlayed -> {

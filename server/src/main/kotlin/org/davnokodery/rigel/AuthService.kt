@@ -49,7 +49,7 @@ class AuthService(@Autowired private val userRepository: UserRepository) {
             return LoginResponse(JWT.create()
                 .withIssuer(ISSUER)
                 .withSubject(user.name)
-                .sign(Algorithm.HMAC256(JWT_SECRET)))
+                .sign(Algorithm.HMAC256(JWT_SECRET)), user.name)
         } catch (e: Exception) {
             throw GameException("Could not authenticate", HttpStatus.INTERNAL_SERVER_ERROR)
         }

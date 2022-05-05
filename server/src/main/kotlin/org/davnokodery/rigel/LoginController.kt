@@ -35,5 +35,6 @@ data class LoginResponse(
         value = "Json Web token",
         notes = "A valid jwt token is required for WebSocket connection initialization and for other REST calls"
     )
-    val jwt: String
+    val jwt: String,
+    val username: String
 )

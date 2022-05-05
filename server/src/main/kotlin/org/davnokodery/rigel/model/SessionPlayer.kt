@@ -28,7 +28,7 @@ data class SessionPlayer(
     fun changeProperty(property: String, delta: Int) {
         val oldValue = properties[property] ?: 0
         properties[property] = oldValue + delta
-        sendPropertyUpdate(PlayerPropertyChange(property, delta, getProperty(property)))
+        sendPropertyUpdate(PlayerPropertyChange(name, property, delta, getProperty(property)))
     }
 
     /**
@@ -38,12 +38,12 @@ data class SessionPlayer(
         propertyChanges.forEach { (property, changes) ->
             val oldDelta = changes.remove(id)
             if (oldDelta != null) {
-                sendPropertyUpdate(PlayerPropertyChange(property, -oldDelta, getProperty(property)))
+                sendPropertyUpdate(PlayerPropertyChange(name, property, -oldDelta, getProperty(property)))
             }
         }
     }
 
-    private fun sendPropertyUpdate(msg: PlayerPropertyChange) = sender.unicast(msg, sessionId)
+    private fun sendPropertyUpdate(msg: PlayerPropertyChange) = sender.broadcast(msg)
     fun changePropertyTemporary(property: String, delta: Int, cardId: String) {
         val changes = propertyChanges[property]
 
@@ -53,11 +53,11 @@ data class SessionPlayer(
             // notify that old change has expired
             val oldDelta = changes[cardId]
             if (oldDelta != null)
-                sendPropertyUpdate(PlayerPropertyChange(property, -oldDelta, getProperty(property)))
+                sendPropertyUpdate(PlayerPropertyChange(name, property, -oldDelta, getProperty(property)))
             changes[cardId] = delta
         }
 
-        sendPropertyUpdate(PlayerPropertyChange(property, delta, getProperty(property)))
+        sendPropertyUpdate(PlayerPropertyChange(name, property, delta, getProperty(property)))
     }
 
     fun cardPlayed(card: Card) {
