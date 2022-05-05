@@ -47,11 +47,11 @@ data class NewCard(val cardData: CardData) : ServerWsMessage()
 )
 @JsonSubTypes(
     JsonSubTypes.Type(value = JwtMessage::class, name = "jwt"),
-    JsonSubTypes.Type(value = CreateGameMessage::class, name = "newgame"),
-    JsonSubTypes.Type(value = JoinGameMessage::class, name = "joingame"),
-    JsonSubTypes.Type(value = StartGameMessage::class, name = "startgame"),
-    JsonSubTypes.Type(value = PlayCardMessage::class, name = "playcard"),
-    JsonSubTypes.Type(value = SkipTurnMessage::class, name = "skipturn"),
+    JsonSubTypes.Type(value = CreateGameMessage::class, name = "new_game"),
+    JsonSubTypes.Type(value = JoinGameMessage::class, name = "join_game"),
+    JsonSubTypes.Type(value = StartGameMessage::class, name = "start_game"),
+    JsonSubTypes.Type(value = PlayCardMessage::class, name = "play_card"),
+    JsonSubTypes.Type(value = EndTurnMessage::class, name = "end_turn"),
     JsonSubTypes.Type(value = GameListRequest::class, name = "game_list"),
 )
 sealed class ClientWsMessage {
@@ -61,6 +61,6 @@ data class JwtMessage(val jwt: String) : ClientWsMessage()
 class CreateGameMessage : ClientWsMessage()
 data class JoinGameMessage(val gameId: String): ClientWsMessage()
 class StartGameMessage: ClientWsMessage()
-data class PlayCardMessage(val cardId: String? = null, val targetId: String? = null): ClientWsMessage()
-class SkipTurnMessage: ClientWsMessage()
+data class PlayCardMessage(val cardId: String, val targetId: String? = null): ClientWsMessage()
+class EndTurnMessage: ClientWsMessage()
 class GameListRequest: ClientWsMessage()

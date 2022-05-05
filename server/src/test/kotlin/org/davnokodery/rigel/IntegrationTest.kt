@@ -105,7 +105,7 @@ class IntegrationTest(
         val opponent = if (tester1.currentGameStatus != Player_1_Turn) tester1 else tester2
         
         assertEquals(100, opponent.properties[PROP_HEALTH])
-        currentPlayer.playCard(currentPlayer.cards.values.find { it.name == FIRE_BALL_NAME })
+        currentPlayer.playCard(currentPlayer.cards.values.find { it.name == FIRE_BALL_NAME }!!)
         assertEquals(95, opponent.properties[PROP_HEALTH])
         assertNull(currentPlayer.cards.values.find { it.name == FIRE_BALL_NAME })
     }
@@ -126,7 +126,7 @@ class IntegrationTest(
         val status = tester1.currentGameStatus
         val amountOfCards = currentPlayer.cards.size
         
-        currentPlayer.playCard(null)
+        currentPlayer.endTurn()
         
         // one new received
         assertEquals(amountOfCards + 1, currentPlayer.cards.size)
@@ -230,9 +230,15 @@ class IntegrationTest(
             delay(200)
         }
 
-        suspend fun playCard(cardId: CardData?) {
+        suspend fun playCard(cardId: CardData) {
             check(connected) { "Not connected!" }
-            session.sendMessage(toJson(PlayCardMessage(cardId?.id)))
+            session.sendMessage(toJson(PlayCardMessage(cardId.id)))
+            delay(200)
+        }
+
+        suspend fun endTurn() {
+            check(connected) { "Not connected!" }
+            session.sendMessage(toJson(EndTurnMessage()))
             delay(200)
         }
 

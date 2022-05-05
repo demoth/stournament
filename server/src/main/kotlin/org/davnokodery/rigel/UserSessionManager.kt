@@ -74,7 +74,7 @@ class UserSessionManager(
                 is GameListRequest -> {
                     userSession.session.sendMessage(toJson(GamesListResponse(games.keys.toList())))
                 }
-                is SkipTurnMessage -> TODO()
+                is EndTurnMessage -> endTurn(session)
             }
         } catch (e: Exception) {
             logger.error("Could not process message: '${message.payload}'", e)
@@ -94,6 +94,17 @@ class UserSessionManager(
         MDC.put(GAME_ID_TAG, gameSession.id)
         gameSession.play(session.id, request.cardId, request.targetId)
         logger.debug("Played card: ${request.cardId}, target: ${request.targetId}")
+    }
+
+    private fun endTurn(session: WebSocketSession) {
+        val gameSession = findGameByPlayerId(session.id)
+        if (gameSession == null) {
+            logger.warn("Not in game")
+            session.sendMessage(toJson(GameMessageUpdate("Not in game")))
+            return
+        }
+        MDC.put(GAME_ID_TAG, gameSession.id)
+        gameSession.endTurn(session.id)
     }
 
     private fun joinGameSession(session: WebSocketSession, request: JoinGameMessage, userSession: UserSession) {
