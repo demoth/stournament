@@ -51,7 +51,25 @@ class UserSessionManager(
     override fun afterConnectionClosed(session: WebSocketSession, status: CloseStatus) {
         logger.info("Disconnected ${sessions[session.id]?.user?.name} (${session.id})")
         sessions.remove(session.id)
-        // todo: leave and stop running games related to this user
+        
+        // erase session in the game
+        findGameByPlayerId(session.id)?.let { game ->
+            val leavingPlayer = when (session.id) {
+                game.player1.session?.sessionId -> game.player1
+                game.player2?.session?.sessionId -> game.player2
+                else -> null
+            }
+            // notify other player if present (can also be disconnected)
+            val stayingPlayer = when {
+                game.player1.session?.sessionId == session.id -> game.player2
+                game.player2?.session?.sessionId == session.id -> game.player1
+                else -> null
+            }
+            leavingPlayer?.session = null
+            stayingPlayer?.session?.let {
+                it.sender.unicast(GameMessageUpdate("${leavingPlayer?.name} left"), it.sessionId)
+            }
+        }
     }
 
     override fun handleTextMessage(session: WebSocketSession, message: TextMessage) {
@@ -179,7 +197,10 @@ class UserSessionManager(
     private fun createMessageSender(gameId: String): MessageSender {
         return object: MessageSender {
             override fun unicast(message: ServerWsMessage, receiver: String) {
-                sessions[receiver]?.session?.sendMessage(toJson(message))
+                sessions[receiver]?.session?.let {
+                    if (it.isOpen)
+                        it.sendMessage(toJson(message))
+                }
             }
 
             override fun broadcast(message: ServerWsMessage) {

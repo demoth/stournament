@@ -135,6 +135,22 @@ class IntegrationTest(
     }
 
     @Test
+    fun `play card - disconnect`() = runBlocking {
+        val tester1 = TestClient(loginPost(testUser1))
+        tester1.login()
+
+        val tester2 = TestClient(loginPost(testUser2))
+        tester2.login()
+
+        tester1.createGame()
+        tester2.joinGame()
+        tester1.startGame()
+        
+        tester1.disconnect()
+        assertNotNull(tester2.messages.find { it.message == "${testUser1.name} left" }, "Not received 'player left' notification")
+    }
+
+    @Test
     fun `relogin - previous connections are dropped`() = runBlocking {
         val user = TestClient(loginPost(testUser1))
         user.login()
@@ -239,6 +255,12 @@ class IntegrationTest(
         suspend fun endTurn() {
             check(connected) { "Not connected!" }
             session.sendMessage(toJson(EndTurnMessage()))
+            delay(200)
+        }
+        
+        suspend fun disconnect() {
+            check(connected) { "Not connected!" }
+            session.close()
             delay(200)
         }
 
