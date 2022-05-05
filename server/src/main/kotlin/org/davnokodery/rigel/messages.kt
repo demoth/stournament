@@ -33,7 +33,7 @@ data class GameStatusUpdate(val newStatus: GameSessionStatus) : ServerWsMessage(
 data class CardPlayed(val cardId: String, val discarded: Boolean) : ServerWsMessage()
 data class NewGameCreated(val gameId: String) : ServerWsMessage()
 data class GameMessageUpdate(val message: String) : ServerWsMessage()
-data class PlayerPropertyChange(val property: String, val delta: Int) : ServerWsMessage()
+data class PlayerPropertyChange(val property: String, val delta: Int, val finalValue: Int) : ServerWsMessage()
 data class GamesListResponse(val games: Collection<String>) : ServerWsMessage()
 data class NewCard(val cardData: CardData) : ServerWsMessage()
 

@@ -254,7 +254,12 @@ class IntegrationTest(
                 is GameMessageUpdate -> messages.add(msg)
                 is GameStatusUpdate -> currentGameStatus = msg.newStatus
                 is GamesListResponse -> gameIds.addAll(msg.games)
-                is PlayerPropertyChange -> properties[msg.property] = (properties[msg.property] ?: 0) + msg.delta //todo: don't calculate on client side, receive final value
+                is PlayerPropertyChange -> {
+                    // check that we track the proper value - all our deltas constitute the final value
+                    assertEquals(msg.finalValue, (properties[msg.property] ?: 0) + msg.delta)
+
+                    properties[msg.property] = msg.finalValue
+                }
                 is NewCard -> cards[msg.cardData.id] = msg.cardData
                 is CardPlayed -> {
                     if (msg.discarded) {

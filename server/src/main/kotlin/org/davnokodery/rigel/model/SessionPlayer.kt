@@ -11,8 +11,8 @@ data class SessionPlayer(
     private val sender: MessageSender,
     private val properties: MutableMap<String, Int> = hashMapOf(),
     private val propertyChanges: MutableMap<String, MutableMap<CardId, Int>> = hashMapOf(),
-    private val cards: MutableMap<String, Card> = hashMapOf(), // todo make it private
-    private val effects: MutableMap<String, Card> = hashMapOf()
+    private val cards: MutableMap<String, Card> = hashMapOf(),
+    private val effects: MutableMap<String, Card> = hashMapOf(),
 ) {
 
     fun addCard(card: Card) {
@@ -28,8 +28,7 @@ data class SessionPlayer(
     fun changeProperty(property: String, delta: Int) {
         val oldValue = properties[property] ?: 0
         properties[property] = oldValue + delta
-        // todo need to calculate new values for health or mana and broadcast them
-        sendPropertyUpdate(PlayerPropertyChange(property, delta))
+        sendPropertyUpdate(PlayerPropertyChange(property, delta, getProperty(property)))
     }
 
     /**
@@ -39,7 +38,7 @@ data class SessionPlayer(
         propertyChanges.forEach { (property, changes) ->
             val oldDelta = changes.remove(id)
             if (oldDelta != null) {
-                sendPropertyUpdate(PlayerPropertyChange(property, -oldDelta))
+                sendPropertyUpdate(PlayerPropertyChange(property, -oldDelta, getProperty(property)))
             }
         }
     }
@@ -54,12 +53,11 @@ data class SessionPlayer(
             // notify that old change has expired
             val oldDelta = changes[cardId]
             if (oldDelta != null)
-                sendPropertyUpdate(PlayerPropertyChange(property, -oldDelta))
+                sendPropertyUpdate(PlayerPropertyChange(property, -oldDelta, getProperty(property)))
             changes[cardId] = delta
         }
 
-        // todo need to calculate new values
-        sendPropertyUpdate(PlayerPropertyChange(property, delta))
+        sendPropertyUpdate(PlayerPropertyChange(property, delta, getProperty(property)))
     }
 
     fun cardPlayed(card: Card) {
