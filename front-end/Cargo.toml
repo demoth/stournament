@@ -4,8 +4,15 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-reqwest = "0.11.10"
+anyhow = "1.0.57"
+console_error_panic_hook = "0.1.7"
+log = "0.4.17"
+reqwest = {version="0.11.10", features=["json"]}
 serde = { version = "1.0.137", features = ["derive"] }
+serde_json = "1.0.81"
+wasm-bindgen-futures = "0.4.30"
+wasm-logger = "0.2.0"
+web-sys = { version = "0.3.57", features = ["FocusEvent"] }
 yew = "0.19.3"
 yew-hooks = "0.1.54"
 
