@@ -176,4 +176,13 @@ data class GameSession(
         return Pair(currentPlayer, enemyPlayer)
     }
 
+    /**
+     * Send the current game state to a player that just reconnected (after a connection drop)
+     */
+    fun sendInitialState(player: Player, newPlayerSession: PlayerSession) {
+        player.session = newPlayerSession
+        player.getInitialState().forEach { newPlayerSession.sender.unicast(it, newPlayerSession.sessionId) }
+        newPlayerSession.sender.unicast(GameStatusUpdate(status), newPlayerSession.sessionId)
+    }
+
 }

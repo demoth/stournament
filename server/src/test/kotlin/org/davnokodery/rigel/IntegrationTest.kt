@@ -135,7 +135,7 @@ class IntegrationTest(
     }
 
     @Test
-    fun `play card - disconnect`() = runBlocking {
+    fun `play card - disconnect & reconnect`() = runBlocking {
         val tester1 = TestClient(loginPost(testUser1))
         tester1.login()
 
@@ -148,6 +148,12 @@ class IntegrationTest(
         
         tester1.disconnect()
         assertNotNull(tester2.messages.find { it.message == "${testUser1.name} left" }, "Not received 'player left' notification")
+        
+        val tester1again = TestClient(loginPost(testUser1))
+        tester1again.login()
+        assertNotNull(tester1again.currentGameStatus, "Status was not received")
+        assertTrue(tester1again.cards.isNotEmpty(), "Cards were not received")
+        assertTrue(tester1again.properties.isNotEmpty(), "Properties were not received")
     }
 
     @Test
@@ -270,7 +276,7 @@ class IntegrationTest(
         }
 
         override fun handleMessage(session: WebSocketSession, message: WebSocketMessage<*>) {
-            check(connected) { "Not connected!" }
+            check(connected) { "Not connected ($username, ${session.id})" }
             if (message !is TextMessage) {
                 logger.error("Non text message received!")
                 return
@@ -285,9 +291,6 @@ class IntegrationTest(
                 is GamesListResponse -> gameIds.addAll(msg.games)
                 is PlayerPropertyChange -> {
                     if (msg.username == username) {
-                        // check that we track the proper value - all our deltas constitute the final value
-                        assertEquals(msg.finalValue, (properties[msg.property] ?: 0) + msg.delta)
-
                         properties[msg.property] = msg.finalValue
                     }
                 }

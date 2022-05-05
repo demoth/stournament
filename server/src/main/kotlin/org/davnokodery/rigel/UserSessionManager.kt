@@ -229,6 +229,14 @@ class UserSessionManager(
                     it.session.close()
                 }
             }
+            
+            // if there is a game with the same user -> rejoin it
+            games.values.find { user.name == it.player1.name || user.name == it.player2?.name }?.let { game ->
+                val player = if (game.player1.name == user.name) game.player1 else game.player2!!
+                check(player.session == null) { "Rejoin: player session is not null" }
+                game.sendInitialState(player, PlayerSession(session.id, createMessageSender(game.id)))
+                logger.debug("Reconnected to game ${game.id}")
+            }
         } else {
             logger.warn("Unexpected JwtMessage")
         }

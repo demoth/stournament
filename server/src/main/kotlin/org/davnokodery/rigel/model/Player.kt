@@ -1,9 +1,6 @@
 package org.davnokodery.rigel.model
 
-import org.davnokodery.rigel.CardPlayed
-import org.davnokodery.rigel.MessageSender
-import org.davnokodery.rigel.NewCard
-import org.davnokodery.rigel.PlayerPropertyChange
+import org.davnokodery.rigel.*
 
 /**
  * Represents connection related data, can change during player reconnect
@@ -30,6 +27,17 @@ data class Player(
         val session = checkNotNull(session) { "Player disconnected" } // fixme: player can disconnect anytime!
         cards[card.id] = card
         session.sender.unicast(NewCard(card.toCardData()), session.sessionId) // todo: make opponent know
+    }
+
+    /**
+     * Collect initial state if a player rejoins in the middle of the game
+     */
+    fun getInitialState(): Collection<ServerWsMessage> {
+        val result = arrayListOf<ServerWsMessage>()
+        result.addAll(cards.values.map { NewCard(it.toCardData()) })
+        result.addAll(properties.keys.map { PlayerPropertyChange(name, it, 0, getProperty(it)) })
+        // todo: send effects
+        return result
     }
 
     fun getProperty(property: String): Int {
@@ -121,4 +129,5 @@ data class Player(
         effects.remove(id)
         session.sender.broadcast(CardPlayed(id, true))
     }
+
 }
