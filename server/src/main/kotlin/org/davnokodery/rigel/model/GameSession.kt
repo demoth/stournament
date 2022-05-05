@@ -27,9 +27,9 @@ interface GameRules {
     /**
      * Initialize players: add required properties and starting cards.
      */
-    fun onGameStarted(player: SessionPlayer, enemyPlayer: SessionPlayer, gameSession: GameSession)
+    fun onGameStarted(player: Player, enemyPlayer: Player, gameSession: GameSession)
 
-    fun afterCardPlayed(card: Card, player: SessionPlayer, enemyPlayer: SessionPlayer, gameSession: GameSession)
+    fun afterCardPlayed(card: Card, player: Player, enemyPlayer: Player, gameSession: GameSession)
 
     /**
      * Place common checks before the card is going to be played.
@@ -38,24 +38,24 @@ interface GameRules {
      * Information messages can be sent to the player through the player.sender
      * @return false if card should not be played.
      */
-    fun beforeCardPlayed(card: Card, player: SessionPlayer, enemyPlayer: SessionPlayer, gameSession: GameSession): Boolean
+    fun beforeCardPlayed(card: Card, player: Player, enemyPlayer: Player, gameSession: GameSession): Boolean
 
     /**
      * Called just before the turn is changed. All effects and expiration logic is already executed.
      */
-    fun onEndTurn(player: SessionPlayer, enemyPlayer: SessionPlayer, gameSession: GameSession)
+    fun onEndTurn(player: Player, enemyPlayer: Player, gameSession: GameSession)
 }
 
 data class GameSession(
     val id: String,
-    val player1: SessionPlayer,
+    val player1: Player,
     internal val sender: MessageSender,
     internal val gameRules: GameRules,
     var status: GameSessionStatus = GameSessionStatus.Created
 ) {
     private val logger = LoggerFactory.getLogger(GameSession::class.java)
 
-    var player2: SessionPlayer? = null
+    var player2: Player? = null
 
     fun changeStatus(newState: GameSessionStatus) {
         status = newState
@@ -107,12 +107,12 @@ data class GameSession(
         // Validations
         val (currentPlayer, enemyPlayer) = getPlayers()
 
-        if (playerSessionId != currentPlayer.sessionId && playerSessionId != enemyPlayer.sessionId) {
+        if (playerSessionId != currentPlayer.session?.sessionId && playerSessionId != enemyPlayer.session?.sessionId) {
             logger.error("Invalid player id: $playerSessionId")
             return false
         }
 
-        if (playerSessionId != currentPlayer.sessionId) {
+        if (playerSessionId != currentPlayer.session?.sessionId) {
             sender.unicast(GameMessageUpdate("It is ${currentPlayer.name}'s turn!"), playerSessionId)
             return false
         }
@@ -168,7 +168,7 @@ data class GameSession(
     /**
      * returns the current player and the opponent, according to the game status
      */
-    private fun getPlayers(): Pair<SessionPlayer, SessionPlayer> {
+    private fun getPlayers(): Pair<Player, Player> {
         val secondPlayer = player2
         check(secondPlayer != null) { "Player 2 is not initialized (Game was not started?)" }
         val currentPlayer = if (status == GameSessionStatus.Player_1_Turn) player1 else secondPlayer

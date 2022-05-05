@@ -4,7 +4,8 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import org.davnokodery.rigel.model.GameSession
 import org.davnokodery.rigel.model.GameSessionStatus
-import org.davnokodery.rigel.model.SessionPlayer
+import org.davnokodery.rigel.model.Player
+import org.davnokodery.rigel.model.PlayerSession
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Autowired
@@ -116,10 +117,9 @@ class UserSessionManager(
         }
         MDC.put(GAME_ID_TAG, gameSession.id)
         if (gameSession.player2 == null) {
-            gameSession.player2 = SessionPlayer(
-                sessionId = session.id,
+            gameSession.player2 = Player(
                 name = userSession.user!!.name,
-                sender = createMessageSender(gameSession.id)
+                session = PlayerSession(session.id, createMessageSender(gameSession.id))
             )
             logger.debug("Joined")
         } else {
@@ -162,10 +162,9 @@ class UserSessionManager(
         val gameId = UUID.randomUUID().toString()
         val newGameSession = GameSession(
             id = gameId,
-            player1 = SessionPlayer(
-                sessionId = session.id,
+            player1 = Player(
                 name = userSession.user!!.name,
-                sender = createMessageSender(gameId)),
+                session = PlayerSession(session.id, createMessageSender(gameId))),
             sender = createMessageSender(gameId),
             gameRules = provingGroundsRules() // todo: make configurable
         )
@@ -184,10 +183,9 @@ class UserSessionManager(
             }
 
             override fun broadcast(message: ServerWsMessage) {
-                val gameSession = games[gameId]
-                check(gameSession != null) { "Game session does not exist $gameId" }
-                sessions[gameSession.player1.sessionId]?.session?.sendMessage(toJson(message))
-                sessions[gameSession.player2?.sessionId]?.session?.sendMessage(toJson(message))
+                val gameSession = checkNotNull(games[gameId]) { "Game session does not exist $gameId" }
+                sessions[gameSession.player1.session?.sessionId]?.session?.sendMessage(toJson(message))
+                sessions[gameSession.player2?.session?.sessionId]?.session?.sendMessage(toJson(message))
             }
         }
     }
@@ -216,7 +214,7 @@ class UserSessionManager(
     }
 
     private fun findGameByPlayerId(sessionId: String) = games.values.firstOrNull {
-        sessionId == it.player1.sessionId || sessionId == it.player2?.sessionId
+        sessionId == it.player1.session?.sessionId || sessionId == it.player2?.session?.sessionId
     }
 
     private fun toJson(it: ServerWsMessage) = TextMessage(mapper.writeValueAsString(it))

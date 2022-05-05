@@ -3,15 +3,15 @@ package org.davnokodery.rigel.model
 import java.util.*
 
 fun interface Validator {
-    fun validate(self: Card, owner: SessionPlayer, enemy: SessionPlayer, targetEffect: Card?): String?
+    fun validate(self: Card, owner: Player, enemy: Player, targetEffect: Card?): String?
 }
 
 fun interface CardAction {
-    fun activate(self: Card, owner: SessionPlayer, enemy: SessionPlayer, targetEffect: Card?)
+    fun activate(self: Card, owner: Player, enemy: Player, targetEffect: Card?)
 }
 
 fun interface CardEffect {
-    fun effect(self: Card, owner: SessionPlayer, enemy: SessionPlayer)
+    fun effect(self: Card, owner: Player, enemy: Player)
 }
 
 typealias CardId = String

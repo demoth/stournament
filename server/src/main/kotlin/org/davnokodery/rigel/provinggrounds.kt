@@ -4,7 +4,7 @@ import org.davnokodery.rigel.model.Card
 import org.davnokodery.rigel.model.GameRules
 import org.davnokodery.rigel.model.GameSession
 import org.davnokodery.rigel.model.GameSessionStatus.*
-import org.davnokodery.rigel.model.SessionPlayer
+import org.davnokodery.rigel.model.Player
 import kotlin.random.Random
 
 // Test game logic, a.k.a Proving Grounds
@@ -23,7 +23,7 @@ const val DEATH_RAY = "death_ray"
 
 fun provingGroundsRules(): GameRules {
     return object : GameRules {
-        override fun onGameStarted(player: SessionPlayer, enemyPlayer: SessionPlayer, gameSession: GameSession) {
+        override fun onGameStarted(player: Player, enemyPlayer: Player, gameSession: GameSession) {
             listOf(player, enemyPlayer).forEach { p ->
                 // initialize properties
                 hashMapOf(
@@ -43,8 +43,8 @@ fun provingGroundsRules(): GameRules {
         
         override fun beforeCardPlayed(
             card: Card,
-            player: SessionPlayer,
-            enemyPlayer: SessionPlayer,
+            player: Player,
+            enemyPlayer: Player,
             gameSession: GameSession
         ): Boolean {
             // do some common logic, like check of there is enough action points
@@ -53,14 +53,14 @@ fun provingGroundsRules(): GameRules {
         
         override fun afterCardPlayed(
             card: Card,
-            player: SessionPlayer,
-            enemyPlayer: SessionPlayer,
+            player: Player,
+            enemyPlayer: Player,
             gameSession: GameSession
         ) {
             // do some common logic, like use action point
         }
 
-        override fun onEndTurn(player: SessionPlayer, enemyPlayer: SessionPlayer, gameSession: GameSession) {
+        override fun onEndTurn(player: Player, enemyPlayer: Player, gameSession: GameSession) {
             // check if game is finished
             val status = gameSession.status
             check(status == Player_1_Turn || status == Player_2_Turn) { "Unexpected game state: $status" }

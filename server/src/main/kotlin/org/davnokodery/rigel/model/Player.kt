@@ -5,10 +5,20 @@ import org.davnokodery.rigel.MessageSender
 import org.davnokodery.rigel.NewCard
 import org.davnokodery.rigel.PlayerPropertyChange
 
-data class SessionPlayer(
+/**
+ * Represents connection related data, can change during player reconnect
+ */
+data class PlayerSession(
     val sessionId: String,
+    val sender: MessageSender
+)
+
+/**
+ * Represents game related player data. Cannot change during the game
+ */
+data class Player(
     val name: String,
-    private val sender: MessageSender,
+    var session: PlayerSession? = null,
     private val properties: MutableMap<String, Int> = hashMapOf(),
     private val propertyChanges: MutableMap<String, MutableMap<CardId, Int>> = hashMapOf(),
     private val cards: MutableMap<String, Card> = hashMapOf(),
@@ -17,8 +27,9 @@ data class SessionPlayer(
 
     fun addCard(card: Card) {
         check(!cards.contains(card.id)) { "Player already has a card with id ${card.id}" }
+        val session = checkNotNull(session) { "Player disconnected" } // fixme: player can disconnect anytime!
         cards[card.id] = card
-        sender.unicast(NewCard(card.toCardData()), sessionId) // todo: make opponent know
+        session.sender.unicast(NewCard(card.toCardData()), session.sessionId) // todo: make opponent know
     }
 
     fun getProperty(property: String): Int {
@@ -43,7 +54,11 @@ data class SessionPlayer(
         }
     }
 
-    private fun sendPropertyUpdate(msg: PlayerPropertyChange) = sender.broadcast(msg)
+    private fun sendPropertyUpdate(msg: PlayerPropertyChange) {
+        val session = checkNotNull(session) { "Player disconnected" } // fixme: player can disconnect anytime!
+        session.sender.broadcast(msg)
+    }
+
     fun changePropertyTemporary(property: String, delta: Int, cardId: String) {
         val changes = propertyChanges[property]
 
@@ -61,14 +76,16 @@ data class SessionPlayer(
     }
 
     fun cardPlayed(card: Card) {
+        val session = checkNotNull(session) { "Player disconnected" } // fixme: player can disconnect anytime!
+
         cards.remove(card.id)
         if (card.ttl > 0) {
             // if a card has a lasting effect -> move it to the current effects
             effects[card.id] = card
-            sender.broadcast(CardPlayed(card.id, false)) //todo: reveal when played
+            session.sender.broadcast(CardPlayed(card.id, false)) //todo: reveal when played
         } else {
             // discard otherwise
-            sender.broadcast(CardPlayed(card.id, true))
+            session.sender.broadcast(CardPlayed(card.id, true))
         }
     }
 
@@ -87,7 +104,7 @@ data class SessionPlayer(
      */
     fun findEffectById(id: String) = effects.values.find { it.id == id }
 
-    fun updateEffects(currentPlayer: SessionPlayer, enemyPlayer: SessionPlayer) = effects.values.filter {
+    fun updateEffects(currentPlayer: Player, enemyPlayer: Player) = effects.values.filter {
         it.onTick?.effect(it, currentPlayer, enemyPlayer)
         it.ttl--
         if (it.ttl <= 0) {
@@ -99,7 +116,9 @@ data class SessionPlayer(
     }
 
     fun removeEffect(id: String) {
+        val session = checkNotNull(session) { "Player disconnected" } // fixme: player can disconnect anytime!
+
         effects.remove(id)
-        sender.broadcast(CardPlayed(id, true))
+        session.sender.broadcast(CardPlayed(id, true))
     }
 }
