@@ -21,5 +21,5 @@ pub enum Message {
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct LoginResponse {
-    jwt: String,
+    pub jwt: String,
 }
