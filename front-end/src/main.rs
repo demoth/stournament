@@ -1,21 +1,23 @@
 mod server_api;
+mod utils;
 
-use server_api::LoginResponse;
-use yew::{
-    function_component, html, html::Scope, use_state, Callback, Component, Html, Properties,
-};
+use gloo::net::websocket::Message;
+use server_api::ServerApi;
+use utils::value_by_id;
+use yew::{html, Callback, Component, FocusEvent, Html, MouseEvent, Properties};
 
 use log::*;
-use serde_json::json;
-use web_sys::FocusEvent;
-use yew_hooks::{use_async, use_web_socket};
 
 enum AppMsg {
-    SuccessfulLogin { jwt: String },
+    LogInStarted,
+    LoggedIn(ServerApi),
+    Msg(String),
+    WsMessage(Message),
 }
 
 struct App {
-    jwt: Option<String>,
+    api: Option<ServerApi>,
+    logging_in: bool,
 }
 
 impl Component for App {
@@ -24,36 +26,61 @@ impl Component for App {
     type Properties = ();
 
     fn create(_ctx: &yew::Context<Self>) -> Self {
-        App { jwt: None }
+        App {
+            api: None,
+            logging_in: false,
+        }
     }
 
-    fn update(&mut self, _ctx: &yew::Context<Self>, msg: Self::Message) -> bool {
+    fn update(&mut self, ctx: &yew::Context<Self>, msg: Self::Message) -> bool {
         match msg {
-            AppMsg::SuccessfulLogin { jwt } => self.jwt = Some(jwt),
+            AppMsg::LoggedIn(mut api) => {
+                api.list_games();
+                self.api = Some(api);
+                true
+            }
+
+            AppMsg::Msg(m) => {
+                info!("{m}");
+                false
+            }
+            AppMsg::WsMessage(m) => {
+                info!("Server says {m:?}");
+                true
+            }
+            AppMsg::LogInStarted => {
+                self.logging_in = true;
+                true
+            }
         }
-        true
     }
 
     fn view(&self, ctx: &yew::Context<Self>) -> Html {
-        let link = ctx.link().clone();
-        let onsubmit = Callback::once(|focus_event: FocusEvent| {
-            focus_event.prevent_default();
-
-            wasm_bindgen_futures::spawn_local(login("daniil", "hello", link));
-        });
-        if let Some(jwt) = &self.jwt {
-            html! {
-                <Connection jwt={jwt.clone()} />
-            }
+        if let Some(api) = &self.api {
+            html!(
+                <h1>{"Playing!"}</h1>
+            )
         } else {
+            if self.logging_in {
+                return html!(
+                    <h1>{"Logging in..."}</h1>
+                );
+            }
+            let onmessage = ctx.link().callback(AppMsg::WsMessage);
+            let onclick = ctx.link().callback_future_once(|_e| async {
+                let login = value_by_id("username").unwrap();
+                let password = value_by_id("pwd").unwrap();
+                let api = ServerApi::login(&login, &password, onmessage).await;
+                AppMsg::LoggedIn(api.unwrap())
+            });
             html! {
-                <form onsubmit={onsubmit}>
+                <>
                 <label for="username">{ "Username:" }</label><br />
                 <input type="text" id="username" name="username" /><br />
                 <label for="pwd">{ "Password:" }</label><br />
                 <input type="password" id="pwd" name="pwd" /><br />
-                <input type="submit"/>
-              </form>
+                <input type="submit" value="Login" onclick={onclick}/>
+                </>
             }
         }
     }
@@ -64,37 +91,6 @@ struct ConnectionProps {
     jwt: String,
 }
 
-#[function_component(Connection)]
-fn connection(props: &ConnectionProps) -> Html {
-    let ws = use_web_socket("ws://localhost:8080/web-socket".to_string());
-    ws.send(
-        json!({
-            "_type": "jwt",
-            "jwt": &format!("Bearer {}", props.jwt)
-        })
-        .to_string(),
-    );
-    html!(
-        <h2>{"connection"}</h2>
-    )
-}
-
-async fn login(username: &str, password: &str, link: Scope<App>) {
-    let response: LoginResponse = reqwest::Client::new()
-        .post("http://localhost:8080/login")
-        .json(&json!({
-            "name": "daniil",
-            "password": "world"
-        }))
-        .send()
-        .await
-        .unwrap()
-        .json()
-        .await
-        .unwrap();
-
-    link.send_message(AppMsg::SuccessfulLogin { jwt: response.jwt });
-}
 fn main() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     wasm_logger::init(wasm_logger::Config::default());
