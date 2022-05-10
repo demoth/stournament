@@ -67,11 +67,15 @@ impl Component for App {
                 );
             }
             let onmessage = ctx.link().callback(AppMsg::WsMessage);
-            let onclick = ctx.link().callback_future_once(|_e| async {
+            let onstartlogin = ctx.link().callback(|()| AppMsg::LogInStarted);
+            let onclick = ctx.link().callback_future_once(move |_e| {
                 let login = value_by_id("username").unwrap();
                 let password = value_by_id("pwd").unwrap();
-                let api = ServerApi::login(&login, &password, onmessage).await;
-                AppMsg::LoggedIn(api.unwrap())
+                onstartlogin.emit(());
+                async move {
+                    let api = ServerApi::login(&login, &password, onmessage).await;
+                    AppMsg::LoggedIn(api.unwrap())
+                }
             });
             html! {
                 <>
