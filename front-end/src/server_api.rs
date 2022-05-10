@@ -96,4 +96,17 @@ impl ServerApi {
             ))
             .unwrap()
     }
+    pub fn new_game(&mut self) {
+        self.sink
+            .try_send(Message::Text(
+                json!(
+                    {
+                        "_type": "new_game"
+                    }
+                )
+                .to_string(),
+            ))
+            .unwrap()
+    }
+    
 }

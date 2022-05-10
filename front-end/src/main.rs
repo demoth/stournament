@@ -9,15 +9,22 @@ use yew::{html, Callback, Component, FocusEvent, Html, MouseEvent, Properties};
 use log::*;
 
 enum AppMsg {
-    LogInStarted,
     LoggedIn(ServerApi),
     Msg(String),
     WsMessage(Message),
+    CreateNewGame,
 }
 
 struct App {
     api: Option<ServerApi>,
-    logging_in: bool,
+    current_screen: Screen,
+}
+
+// FIXME: disable login button after the first press
+// FIXME: add yew router
+enum Screen {
+    Login,
+    ListGames,
 }
 
 impl Component for App {
@@ -28,7 +35,7 @@ impl Component for App {
     fn create(_ctx: &yew::Context<Self>) -> Self {
         App {
             api: None,
-            logging_in: false,
+            current_screen: Screen::Login,
         }
     }
 
@@ -37,6 +44,7 @@ impl Component for App {
             AppMsg::LoggedIn(mut api) => {
                 api.list_games();
                 self.api = Some(api);
+                self.current_screen = Screen::ListGames;
                 true
             }
 
@@ -48,45 +56,54 @@ impl Component for App {
                 info!("Server says {m:?}");
                 true
             }
-            AppMsg::LogInStarted => {
-                self.logging_in = true;
-                true
+            AppMsg::CreateNewGame => {
+                self.api.as_mut().unwrap().new_game();
+                false
             }
         }
     }
 
     fn view(&self, ctx: &yew::Context<Self>) -> Html {
-        if let Some(api) = &self.api {
-            html!(
-                <h1>{"Playing!"}</h1>
-            )
-        } else {
-            if self.logging_in {
-                return html!(
-                    <h1>{"Logging in..."}</h1>
-                );
-            }
-            let onmessage = ctx.link().callback(AppMsg::WsMessage);
-            let onstartlogin = ctx.link().callback(|()| AppMsg::LogInStarted);
-            let onclick = ctx.link().callback_future_once(move |_e| {
-                let login = value_by_id("username").unwrap();
-                let password = value_by_id("pwd").unwrap();
-                onstartlogin.emit(());
-                async move {
-                    let api = ServerApi::login(&login, &password, onmessage).await;
-                    AppMsg::LoggedIn(api.unwrap())
+        match self.current_screen {
+            Screen::Login => {
+                let onmessage = ctx.link().callback(AppMsg::WsMessage);
+                let onclick = ctx.link().callback_future_once(move |_e| {
+                    let login = value_by_id("username").unwrap();
+                    let password = value_by_id("pwd").unwrap();
+                    async move {
+                        let api = ServerApi::login(&login, &password, onmessage).await;
+                        AppMsg::LoggedIn(api.unwrap())
+                    }
+                });
+                html! {
+                    <>
+                    <label for="username">{ "Username:" }</label><br />
+                    <input type="text" id="username" name="username" /><br />
+                    <label for="pwd">{ "Password:" }</label><br />
+                    <input type="password" id="pwd" name="pwd" /><br />
+                    <input type="submit" value="Login" onclick={onclick}/>
+                    </>
                 }
-            });
-            html! {
-                <>
-                <label for="username">{ "Username:" }</label><br />
-                <input type="text" id="username" name="username" /><br />
-                <label for="pwd">{ "Password:" }</label><br />
-                <input type="password" id="pwd" name="pwd" /><br />
-                <input type="submit" value="Login" onclick={onclick}/>
-                </>
+            }
+            Screen::ListGames => {
+                // let games  = self.api.unwrap().list_games()
+                // FIXME: new component will have non-optional api
+                let newgame = ctx.link().callback(|_e| AppMsg::CreateNewGame);
+                html! {
+                    <>
+                    <h2>{ "Here be your games" }</h2>
+                    <button onclick={newgame}>{ "New game" }</button>
+                    </>
+                }
             }
         }
+        // if let Some(api) = &self.api {
+        //     html!(
+        //         <h1>{"Playing!"}</h1>
+        //     )
+        // } else {
+
+        // }
     }
 }
 
