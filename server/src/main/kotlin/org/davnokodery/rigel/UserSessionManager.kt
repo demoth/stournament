@@ -22,6 +22,7 @@ data class UserSession(
     var user: User? = null
 )
 
+// todo: send & process messages in separate threads
 interface MessageSender {
     fun unicast(message: ServerWsMessage, receiver: String)
 
