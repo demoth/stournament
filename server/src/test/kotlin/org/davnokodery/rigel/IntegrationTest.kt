@@ -11,6 +11,8 @@ import org.davnokodery.rigel.model.CardData
 import org.davnokodery.rigel.model.GameSessionStatus
 import org.davnokodery.rigel.model.GameSessionStatus.Player_1_Turn
 import org.davnokodery.rigel.model.GameSessionStatus.Player_2_Turn
+import org.davnokodery.rigel.model.LoginRequest
+import org.davnokodery.rigel.model.LoginResponse
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test

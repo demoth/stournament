@@ -3,11 +3,14 @@ package org.demoth.betelgeuse
 import com.badlogic.gdx.Game
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.scenes.scene2d.ui.Skin
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.module.kotlin.readValue
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.davnokodery.rigel.model.LoginResponse
 
 // create title screen - show MOTD + news: Image, text area, login button
 // create login screen - usual login details
@@ -20,7 +23,7 @@ data class LoginRequest(val name: String, val password: String)
 
 class Starclient : Game() {
     val jsonType = "application/json; charset=utf-8"
-    val mapper = jacksonObjectMapper()
+    private val mapper: ObjectMapper = jacksonObjectMapper()
 
     lateinit var skin: Skin
     lateinit var titleScreen: TitleScreen
@@ -28,6 +31,7 @@ class Starclient : Game() {
     lateinit var gamesListScreen: GamesListScreen
 
     var jwt = ""
+    var username = ""
 
     override fun create() {
         skin = Skin(Gdx.files.classpath("uiskin.json"))
@@ -51,11 +55,18 @@ class Starclient : Game() {
         val response = client.newCall(request).execute()
         println("Response: ${response.body?.string()}")
         if (response.isSuccessful) {
+            val loginResponse: LoginResponse = mapper.readValue(response.body?.string()!!)
+            jwt = loginResponse.jwt
             setScreen(gamesListScreen)
         }
     }
 
     fun createNewGame() {
         println("New game created")
+    }
+    
+    fun notify(text: String) {
+        // todo: implement notifications (for example: https://github.com/wentsa/Toast-LibGDX)
+        println(text)
     }
 }

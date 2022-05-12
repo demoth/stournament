@@ -1,3 +1,4 @@
 rootProject.name = "stournament"
-include(":server")
+include("common")
+include("server")
 include("client-gdx")

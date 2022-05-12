@@ -11,6 +11,8 @@ val gdxVersion = "1.10.0"
 
 dependencies {
 
+    implementation(project(":common"))
+    
     implementation("com.badlogicgames.gdx:gdx-backend-lwjgl3:$gdxVersion")
     implementation("com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop")
     implementation("com.squareup.okhttp3:okhttp:4.9.3")

@@ -1,7 +1,8 @@
 package org.davnokodery.rigel
 
-import io.swagger.annotations.ApiModelProperty
 import io.swagger.annotations.ApiOperation
+import org.davnokodery.rigel.model.LoginRequest
+import org.davnokodery.rigel.model.LoginResponse
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.web.bind.annotation.CrossOrigin
 import org.springframework.web.bind.annotation.PostMapping
@@ -18,23 +19,3 @@ class LoginController(@Autowired val authService: AuthService) {
         return authService.loginUser(login.name, login.password)
     }
 }
-
-data class LoginRequest(
-    @ApiModelProperty("User name")
-    val name: String,
-    
-    @ApiModelProperty(
-        value = "User password",
-        notes = "FIXME: don't use plain text password"
-    )
-    val password: String
-)
-
-data class LoginResponse(
-    @ApiModelProperty(
-        value = "Json Web token",
-        notes = "A valid jwt token is required for WebSocket connection initialization and for other REST calls"
-    )
-    val jwt: String,
-    val username: String
-)

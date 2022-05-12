@@ -1,6 +1,8 @@
 package org.davnokodery.rigel
 
 import org.davnokodery.rigel.TestDataCreator.Companion.testUser1
+import org.davnokodery.rigel.model.LoginRequest
+import org.davnokodery.rigel.model.LoginResponse
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test

@@ -11,10 +11,11 @@ plugins {
 java.sourceCompatibility = JavaVersion.VERSION_11
 
 dependencies {
+    implementation(project(":common"))
+    
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-websocket")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 
     implementation("io.springfox", "springfox-boot-starter", "3.0.0")
     implementation("io.springfox", "springfox-swagger-ui", "2.9.2")

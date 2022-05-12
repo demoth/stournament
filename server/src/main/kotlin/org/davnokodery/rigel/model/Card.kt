@@ -50,14 +50,3 @@ data class Card(
 ) {
     fun toCardData() = CardData(id, name, iconName, description, tags)
 }
-
-/**
- * What is sent to the client
- */
-data class CardData(
-    val id: String,
-    val name: String,
-    val iconName: String,
-    val description: String,
-    val tags: Set<String> = hashSetOf()
-)

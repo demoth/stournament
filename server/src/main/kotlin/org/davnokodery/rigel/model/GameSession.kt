@@ -6,21 +6,6 @@ import org.davnokodery.rigel.MessageSender
 import org.slf4j.LoggerFactory
 import java.util.*
 
-enum class GameSessionStatus {
-    Created,
-    Player_1_Turn,
-    Player_2_Turn,
-    Player_1_Won,
-    Player_2_Won;
-
-    fun started(): Boolean {
-        return this == Player_1_Turn || this == Player_2_Turn
-    }
-    
-    fun finished(): Boolean {
-        return this == Player_1_Won || this == Player_2_Won
-    }
-}
 
 interface GameRules {
 
