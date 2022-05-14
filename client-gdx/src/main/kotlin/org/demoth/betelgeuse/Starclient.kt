@@ -11,6 +11,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.davnokodery.rigel.model.LoginResponse
+import org.springframework.web.socket.client.WebSocketClient
 
 // create title screen - show MOTD + news: Image, text area, login button
 // create login screen - usual login details
@@ -26,7 +27,7 @@ private const val SERVER_URL = "http://localhost:8080/login"
 class Starclient : Game() {
     val jsonType = "application/json; charset=utf-8".toMediaTypeOrNull()
     private val mapper: ObjectMapper = jacksonObjectMapper()
-    private val client = OkHttpClient()
+    private val restClient = OkHttpClient()
 
     lateinit var skin: Skin
     lateinit var titleScreen: TitleScreen
@@ -47,13 +48,14 @@ class Starclient : Game() {
     }
 
     fun login(username: String, password: String) {
+        // todo: move to another thread
         println("Logging in with $username / $password")
         val loginRequest = LoginRequest(username, password)
         val request = Request.Builder()
             .post(mapper.writeValueAsString(loginRequest).toRequestBody(jsonType))
             .url(SERVER_URL)
             .build()
-        val response = client.newCall(request).execute()
+        val response = restClient.newCall(request).execute()
         val responseBody = response.body?.string()
         println("Response: $responseBody")
         if (response.isSuccessful) {
@@ -62,6 +64,9 @@ class Starclient : Game() {
             this.username = loginResponse.username
             notify("Logged in as $username")
             println("Jwt token: $jwt")
+            val wsclient = WsClient()
+            wsclient.jwt = jwt
+            wsclient.login()
             setScreen(gamesListScreen)
         } else {
             notify("Could not login")
