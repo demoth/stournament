@@ -86,7 +86,7 @@ class UserSessionManager(
             MDC.put(USER_ID_TAG, userSession.user?.name)
 
             when (val request: ClientWsMessage = mapper.readValue(message.payload)) {
-                is JwtMessage -> validateJwtAuth(session, request, userSession)
+                is JwtMessage -> validateJwtAuth(session, "Bearer ${request.jwt}", userSession)
                 is CreateGameMessage -> createGameSession(session, userSession)
                 is StartGameMessage -> startGameSession(session)
                 is JoinGameMessage -> joinGameSession(session, request, userSession)
@@ -215,9 +215,9 @@ class UserSessionManager(
     /**
      * Validate jwt message and initialize the websocket connection. Disconnect for any problem.
      */
-    private fun validateJwtAuth(session: WebSocketSession, request: JwtMessage, userSession: UserSession) {
+    private fun validateJwtAuth(session: WebSocketSession, jwt: String, userSession: UserSession) {
         if (userSession.user == null) {
-            val user = authService.validateToken(request.jwt)
+            val user = authService.validateToken(jwt)
             userSession.user = user
             MDC.put(USER_ID_TAG, user.name)
             // drop other active sessions for the same user

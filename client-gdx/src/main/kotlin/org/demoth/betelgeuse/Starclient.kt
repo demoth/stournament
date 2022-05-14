@@ -3,15 +3,8 @@ package org.demoth.betelgeuse
 import com.badlogic.gdx.Game
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.scenes.scene2d.ui.Skin
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.davnokodery.rigel.model.LoginResponse
-import org.springframework.web.socket.client.WebSocketClient
+import org.davnokodery.rigel.*
+import org.davnokodery.rigel.model.LoginRequest
 
 // create title screen - show MOTD + news: Image, text area, login button
 // create login screen - usual login details
@@ -20,22 +13,15 @@ import org.springframework.web.socket.client.WebSocketClient
 // create ingame screen - opponent cards(invisible), opponent effects, my effects, my cards
 // create endgame screen - show score, return to game list screen
 
-data class LoginRequest(val name: String, val password: String)
-
-private const val SERVER_URL = "http://localhost:8080/login"
-
 class Starclient : Game() {
-    val jsonType = "application/json; charset=utf-8".toMediaTypeOrNull()
-    private val mapper: ObjectMapper = jacksonObjectMapper()
-    private val restClient = OkHttpClient()
 
     lateinit var skin: Skin
     lateinit var titleScreen: TitleScreen
     lateinit var loginScreen: LoginScreen
     lateinit var gamesListScreen: GamesListScreen
 
-    var jwt = ""
-    var username = ""
+    private val restClient = RestClient()
+    private var wsClient: WsClient? = null
 
     override fun create() {
         skin = Skin(Gdx.files.classpath("uiskin.json"))
@@ -49,32 +35,35 @@ class Starclient : Game() {
 
     fun login(username: String, password: String) {
         // todo: move to another thread
-        println("Logging in with $username / $password")
-        val loginRequest = LoginRequest(username, password)
-        val request = Request.Builder()
-            .post(mapper.writeValueAsString(loginRequest).toRequestBody(jsonType))
-            .url(SERVER_URL)
-            .build()
-        val response = restClient.newCall(request).execute()
-        val responseBody = response.body?.string()
-        println("Response: $responseBody")
-        if (response.isSuccessful) {
-            val loginResponse: LoginResponse = mapper.readValue(responseBody!!)
-            jwt = loginResponse.jwt
-            this.username = loginResponse.username
-            notify("Logged in as $username")
-            println("Jwt token: $jwt")
-            val wsclient = WsClient()
-            wsclient.jwt = jwt
-            wsclient.login()
+        println("Logging in as $username...")
+        restClient.login(LoginRequest(username, password)) {
+            wsClient?.close()
+            // todo: save jwt token
+            wsClient = WsClient(it.jwt) {
+                // run in the main rendering frame
+                Gdx.app.postRunnable {
+                    handleServerMessage(it)
+                }
+            }
+            // todo: change screen only after successful login
             setScreen(gamesListScreen)
-        } else {
-            notify("Could not login")
+        }
+    }
+    private fun handleServerMessage(msg: ServerWsMessage) {
+        when(msg) {
+            is CardPlayed -> TODO()
+            is GameMessageUpdate -> TODO()
+            is GameStatusUpdate -> println("Game status: ${msg.newStatus}")
+            is GamesListResponse -> gamesListScreen.setGames(msg.games)
+            is NewCard -> TODO()
+            is NewGameCreated -> gamesListScreen.addGame(msg.gameId)
+            is PlayerPropertyChange -> TODO()
         }
     }
 
     fun createNewGame() {
         println("New game created")
+        wsClient?.send(CreateGameMessage())
     }
     
     fun notify(text: String) {

@@ -9,6 +9,8 @@ import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
 
 
 class GamesListScreen(game: Starclient) : StageScreen() {
+
+    private var gameList: List<String>
     init {
         val table = Table(game.skin)
         table.setFillParent(true)
@@ -25,11 +27,23 @@ class GamesListScreen(game: Starclient) : StageScreen() {
         table.add(Label("Existing games:", game.skin))
         table.row()
 
-        val gameList = List<String>(game.skin)
-        gameList.setItems("Game1", "Game2", "Game3")
+        gameList = List<String>(game.skin)
+        gameList.setItems()
 
         table.add(gameList)
 
         stage.addActor(table)
+    }
+
+    fun setGames (games: Collection<String>) {
+        val gameIds = com.badlogic.gdx.utils.Array<String>(games.size)
+        games.forEach { gameIds.add(it) }
+        gameList.clear()
+        gameList.setItems(gameIds)
+    }
+
+    fun addGame(gameId: String) {
+        gameList.items.add(gameId)
+        gameList.setItems(gameList.items)
     }
 }

@@ -226,7 +226,7 @@ class IntegrationTest(
 
         suspend fun login() {
             check(connected) { "Not connected!" }
-            session.sendMessage(TextMessage(mapper.writeValueAsString(JwtMessage("Bearer ${loginDetails.jwt}"))))
+            session.sendMessage(TextMessage(mapper.writeValueAsString(JwtMessage(loginDetails.jwt))))
             delay(200)
         }
 
