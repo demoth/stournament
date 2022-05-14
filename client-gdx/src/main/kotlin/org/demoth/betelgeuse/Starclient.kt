@@ -21,9 +21,12 @@ import org.davnokodery.rigel.model.LoginResponse
 
 data class LoginRequest(val name: String, val password: String)
 
+private const val SERVER_URL = "http://localhost:8080/login"
+
 class Starclient : Game() {
-    val jsonType = "application/json; charset=utf-8"
+    val jsonType = "application/json; charset=utf-8".toMediaTypeOrNull()
     private val mapper: ObjectMapper = jacksonObjectMapper()
+    private val client = OkHttpClient()
 
     lateinit var skin: Skin
     lateinit var titleScreen: TitleScreen
@@ -46,18 +49,22 @@ class Starclient : Game() {
     fun login(username: String, password: String) {
         println("Logging in with $username / $password")
         val loginRequest = LoginRequest(username, password)
-        val client = OkHttpClient()
         val request = Request.Builder()
-            .post(mapper.writeValueAsString(loginRequest)
-                .toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull()))
-            .url("http://localhost:8080/login")
+            .post(mapper.writeValueAsString(loginRequest).toRequestBody(jsonType))
+            .url(SERVER_URL)
             .build()
         val response = client.newCall(request).execute()
-        println("Response: ${response.body?.string()}")
+        val responseBody = response.body?.string()
+        println("Response: $responseBody")
         if (response.isSuccessful) {
-            val loginResponse: LoginResponse = mapper.readValue(response.body?.string()!!)
+            val loginResponse: LoginResponse = mapper.readValue(responseBody!!)
             jwt = loginResponse.jwt
+            this.username = loginResponse.username
+            notify("Logged in as $username")
+            println("Jwt token: $jwt")
             setScreen(gamesListScreen)
+        } else {
+            notify("Could not login")
         }
     }
 
