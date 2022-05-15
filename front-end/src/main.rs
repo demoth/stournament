@@ -55,7 +55,11 @@ impl Component for App {
                 false
             }
             AppMsg::WsMessage(m) => {
-                info!("Server says {m:?}");
+                match m {
+                    RigelServerMessage::GamesListResponse { games } => self.games = games,
+                    RigelServerMessage::NewGameCreated { gameId } => self.games.push(gameId),
+                    _ => info!("Server says {m:?}"),
+                }
                 true
             }
             AppMsg::CreateNewGame => {
@@ -98,7 +102,9 @@ impl Component for App {
                         if self.games.is_empty() {
                             <h2>{ "No games"}</h2>
                         } else {
-                            { for self.games.iter() }
+                            <ul>
+                            { for self.games.iter().map(|g| html!{<li>{g}</li>}) }
+                            </ul>
                         }
                     </ul>
                     <button onclick={newgame}>{ "New game" }</button>

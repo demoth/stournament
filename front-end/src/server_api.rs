@@ -27,21 +27,15 @@ pub enum GameSessionStatus {
 pub enum RigelServerMessage {
     #[serde(rename = "status")]
     GameStatusUpdate { newStatus: GameSessionStatus },
+    #[serde(rename = "game_list")]
+    GamesListResponse { games: Vec<String> },
+    #[serde(rename = "new_game_created")]
+    NewGameCreated { gameId: String },
 }
 
 #[derive(Deserialize, Debug)]
 pub struct LoginResponse {
     pub jwt: String,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct GamesListResponse {
-    pub games: Vec<String>,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct NewGameResponse {
-    pub gameId: String,
 }
 
 pub struct ServerApi {
