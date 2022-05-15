@@ -1,22 +1,25 @@
+mod game_list;
+mod login;
 mod server_api;
 mod utils;
 
-use gloo::net::websocket::Message;
+use std::{cell::RefCell, rc::Rc};
+
+use crate::game_list::GameList;
+use crate::login::Login;
+use log::*;
 use server_api::{RigelServerMessage, ServerApi};
 use utils::value_by_id;
-use yew::{html, Callback, Component, FocusEvent, Html, MouseEvent, Properties};
-
-use log::*;
+use yew::prelude::*;
+use yew_router::prelude::*;
 
 enum AppMsg {
     LoggedIn(ServerApi),
-    Msg(String),
     WsMessage(RigelServerMessage),
-    CreateNewGame,
 }
 
 struct App {
-    api: Option<ServerApi>,
+    api: Option<Rc<RefCell<ServerApi>>>,
     current_screen: Screen,
     games: Vec<String>,
 }
@@ -26,6 +29,19 @@ struct App {
 enum Screen {
     Login,
     ListGames,
+}
+
+#[derive(Clone, Routable, PartialEq)]
+enum Route {
+    #[at("/")]
+    Home,
+    #[at("/login")]
+    Login,
+    #[at("/games")]
+    GamesList,
+    #[not_found]
+    #[at("/404")]
+    NotFound,
 }
 
 impl Component for App {
@@ -45,15 +61,11 @@ impl Component for App {
         match msg {
             AppMsg::LoggedIn(mut api) => {
                 api.list_games();
-                self.api = Some(api);
+                self.api = Some(Rc::new(RefCell::new(api)));
                 self.current_screen = Screen::ListGames;
                 true
             }
 
-            AppMsg::Msg(m) => {
-                info!("{m}");
-                false
-            }
             AppMsg::WsMessage(m) => {
                 match m {
                     RigelServerMessage::GamesListResponse { games } => self.games = games,
@@ -61,57 +73,38 @@ impl Component for App {
                     _ => info!("Server says {m:?}"),
                 }
                 true
-            }
-            AppMsg::CreateNewGame => {
-                self.api.as_mut().unwrap().new_game();
-                false
-            }
+            } // AppMsg::CreateNewGame => {
+              //     self.api.as_mut().unwrap().new_game();
+              //     false
+              // }
         }
     }
 
     fn view(&self, ctx: &yew::Context<Self>) -> Html {
-        match self.current_screen {
-            Screen::Login => {
-                let onmessage = ctx.link().callback(AppMsg::WsMessage);
-                let onclick = ctx.link().callback_future_once(move |_e| {
-                    // FIXME: use node refs
-                    let login = value_by_id("username").unwrap();
-                    let password = value_by_id("pwd").unwrap();
-                    async move {
-                        let api = ServerApi::login(&login, &password, onmessage).await;
-                        AppMsg::LoggedIn(api.unwrap())
-                    }
-                });
-                html! {
-                    <>
-                    <label for="username">{ "Username:" }</label><br />
-                    <input type="text" id="username" name="username" /><br />
-                    <label for="pwd">{ "Password:" }</label><br />
-                    <input type="password" id="pwd" name="pwd" /><br />
-                    <input type="submit" value="Login" onclick={onclick}/>
-                    </>
-                }
-            }
-            Screen::ListGames => {
-                // let games  = self.api.unwrap().list_games()
-                // FIXME: new component will have non-optional api
-                let newgame = ctx.link().callback(|_e| AppMsg::CreateNewGame);
-                html! {
-                    <>
-                    <ul>
-                        if self.games.is_empty() {
-                            <h2>{ "No games"}</h2>
-                        } else {
-                            <ul>
-                            { for self.games.iter().map(|g| html!{<li>{g}</li>}) }
-                            </ul>
-                        }
-                    </ul>
-                    <button onclick={newgame}>{ "New game" }</button>
-                    </>
-                }
-            }
-        }
+        // match self.current_screen {
+        //     Screen::Login => {
+
+        //     }
+        //     Screen::ListGames => {
+        //         // let games  = self.api.unwrap().list_games()
+        //         // FIXME: new component will have non-optional api
+        //         let newgame = ctx.link().callback(|_e| AppMsg::CreateNewGame);
+        //         html! {
+        //             <>
+        //             <ul>
+        //                 if self.games.is_empty() {
+        //                     <h2>{ "No games"}</h2>
+        //                 } else {
+        //                     <ul>
+        //                     { for self.games.iter().map(|g| html!{<li>{g}</li>}) }
+        //                     </ul>
+        //                 }
+        //             </ul>
+        //             <button onclick={newgame}>{ "New game" }</button>
+        //             </>
+        //         }
+        //     }
+        // };
         // if let Some(api) = &self.api {
         //     html!(
         //         <h1>{"Playing!"}</h1>
@@ -119,6 +112,43 @@ impl Component for App {
         // } else {
 
         // }
+
+        let link = ctx.link().clone();
+        let link2 = link.clone();
+        let api = self.api.as_ref().map(Rc::clone);
+        let gotologin = Callback::from(move |_| link2.history().unwrap().push(Route::Login));
+
+        let switch = move |route: &Route| -> Html {
+            let onmessage = link.callback(AppMsg::WsMessage);
+            let onlogin = link.callback_future(move |_e| {
+                let onmessage = onmessage.clone();
+                // FIXME: use node refs
+                let login = value_by_id("username").unwrap();
+                let password = value_by_id("pwd").unwrap();
+                async move {
+                    let api = ServerApi::login(&login, &password, onmessage).await;
+                    AppMsg::LoggedIn(api.unwrap())
+                }
+            });
+            match route {
+                Route::Home => html! { <><h1> {"Home"} </h1> <button onclick={gotologin.clone()} /> </>},
+                Route::Login => html! {<Login onlogin={onlogin} />},
+                Route::GamesList => {
+                    if let Some(api) = &api {
+                        html! { <GameList api={Rc::clone(api)} />}
+                    } else {
+                        html! { "Not logged in"}
+                    }
+                }
+                Route::NotFound => html!("Not found"),
+            }
+        };
+
+        html! {
+            <BrowserRouter>
+                <Switch<Route> render={Switch::render(switch)} />
+            </BrowserRouter>
+        }
     }
 }
 

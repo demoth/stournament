@@ -42,6 +42,15 @@ pub struct ServerApi {
     sink: Sender<Message>,
 }
 
+/// The server api is always the same
+/// FIXME: This is needed to use api in props,
+/// maybe better to use an agent and talk to it
+impl PartialEq for ServerApi {
+    fn eq(&self, other: &Self) -> bool {
+        true
+    }
+}
+
 impl ServerApi {
     pub async fn login(
         username: &str,
