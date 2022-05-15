@@ -1,23 +1,29 @@
-use yew::{prelude::*};
+use wasm_bindgen_futures::spawn_local;
+use yew::prelude::*;
 
-use crate::App;
-
-
-#[derive(Properties, PartialEq)]
-pub struct Props {
-    pub onlogin: Callback<MouseEvent>
-}
+use crate::{app::ApiContext, utils::value_by_ref};
 
 #[function_component(Login)]
-pub fn login(props: &Props) -> Html {
-    let onlogin = props.onlogin.clone();
+pub fn login() -> Html {
+    let ctx = use_context::<ApiContext>().unwrap();
+    let username = NodeRef::default();
+    let password = NodeRef::default();
+    let password_clone = password.clone();
+    let username_clone = NodeRef::default();
+    let onclick = Callback::once(move |e| {
+        let login = value_by_ref(username_clone).unwrap();
+        let password = value_by_ref(password_clone.clone()).unwrap();
+        spawn_local(async move {
+            ctx.api.lock().await.login(&login, &password).await.unwrap();
+        })
+    });
     html! {
         <>
         <label for="username">{ "Username:" }</label><br />
-        <input type="text" id="username" name="username" /><br />
+        <input type="text" ref={username} name="username" /><br />
         <label for="pwd">{ "Password:" }</label><br />
-        <input type="password" id="pwd" name="pwd" /><br />
-        <input type="submit" value="Login" onclick={onlogin}/>
+        <input type="password" ref={password} name="pwd" /><br />
+        <input type="submit" onclick = {onclick} value="Login"/>
         </>
     }
 }

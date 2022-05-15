@@ -6,7 +6,7 @@ use futures::{
     stream::{SplitSink, SplitStream},
     SinkExt, StreamExt,
 };
-use gloo::net::websocket::{futures::WebSocket, Message, WebSocketError};
+use gloo::net::websocket::{futures::WebSocket, Message as WsMessage, WebSocketError};
 use log::*;
 use serde::Deserialize;
 use serde_json::json;
@@ -39,7 +39,8 @@ pub struct LoginResponse {
 }
 
 pub struct ServerApi {
-    sink: Sender<Message>,
+    onmessage: Callback<RigelServerMessage>,
+    sink: Option<Sender<WsMessage>>,
 }
 
 /// The server api is always the same
@@ -52,11 +53,8 @@ impl PartialEq for ServerApi {
 }
 
 impl ServerApi {
-    pub async fn login(
-        username: &str,
-        password: &str,
-        onmessage: Callback<RigelServerMessage>,
-    ) -> anyhow::Result<ServerApi> {
+    pub async fn login(&mut self, username: &str, password: &str) -> anyhow::Result<()> {
+        let onmessage = self.onmessage.clone();
         let response = gloo::net::http::Request::post("http://localhost:8080/login")
             .json(&json!({
                 "name": username,
@@ -69,7 +67,7 @@ impl ServerApi {
         let websocket = WebSocket::open("ws://localhost:8080/web-socket")
             .map_err(|e| format_err!("Error connecting to WS: {e}"))?;
         let (mut sink, mut source) = websocket.split();
-        sink.send(Message::Text(
+        sink.send(WsMessage::Text(
             json!({
                 "_type": "jwt",
                 "jwt": &format!("Bearer {}", response.jwt)
@@ -82,7 +80,7 @@ impl ServerApi {
             while let Some(m) = source.next().await {
                 match m {
                     Ok(m) => {
-                        if let Message::Text(text_message) = m {
+                        if let WsMessage::Text(text_message) = m {
                             let rigel_message: Result<RigelServerMessage, _> =
                                 serde_json::from_str(&text_message);
                             match rigel_message {
@@ -104,30 +102,34 @@ impl ServerApi {
             }
         });
 
-        Ok(ServerApi { sink: tx })
+        self.sink = Some(tx);
+        Ok(())
     }
+
     pub fn list_games(&mut self) {
+        self.send_message(json!({
+            "_type": "game_list"
+        }))
+    }
+
+    pub fn new_game(&mut self) {
+        self.send_message(json!({
+            "_type": "new_game"
+        }));
+    }
+
+    fn send_message(&mut self, message: serde_json::Value) {
         self.sink
-            .try_send(Message::Text(
-                json!(
-                    {
-                        "_type": "game_list"
-                    }
-                )
-                .to_string(),
-            ))
+            .as_mut()
+            .unwrap()
+            .try_send(WsMessage::Text(message.to_string()))
             .unwrap()
     }
-    pub fn new_game(&mut self) {
-        self.sink
-            .try_send(Message::Text(
-                json!(
-                    {
-                        "_type": "new_game"
-                    }
-                )
-                .to_string(),
-            ))
-            .unwrap()
+
+    pub(crate) fn new(onmessage: Callback<RigelServerMessage>) -> Self {
+        ServerApi {
+            sink: None,
+            onmessage,
+        }
     }
 }
