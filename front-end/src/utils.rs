@@ -1,8 +1,8 @@
 use wasm_bindgen::JsCast;
 use web_sys::HtmlInputElement;
-use yew::{NodeRef, Html};
 
-pub fn value_by_ref(node_ref: NodeRef) -> Option<String> {
-    let element = node_ref.cast::<HtmlInputElement>()?;
+pub fn value_by_id(id: &str) -> Option<String> {
+    let element = gloo::utils::document().get_element_by_id(id)?;
+    let element = element.dyn_ref::<HtmlInputElement>()?;
     Some(element.value())
 }
