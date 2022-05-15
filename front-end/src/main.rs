@@ -2,7 +2,7 @@ mod server_api;
 mod utils;
 
 use gloo::net::websocket::Message;
-use server_api::ServerApi;
+use server_api::{RigelServerMessage, ServerApi};
 use utils::value_by_id;
 use yew::{html, Callback, Component, FocusEvent, Html, MouseEvent, Properties};
 
@@ -11,13 +11,14 @@ use log::*;
 enum AppMsg {
     LoggedIn(ServerApi),
     Msg(String),
-    WsMessage(Message),
+    WsMessage(RigelServerMessage),
     CreateNewGame,
 }
 
 struct App {
     api: Option<ServerApi>,
     current_screen: Screen,
+    games: Vec<String>,
 }
 
 // FIXME: disable login button after the first press
@@ -36,6 +37,7 @@ impl Component for App {
         App {
             api: None,
             current_screen: Screen::Login,
+            games: vec![],
         }
     }
 
@@ -68,6 +70,7 @@ impl Component for App {
             Screen::Login => {
                 let onmessage = ctx.link().callback(AppMsg::WsMessage);
                 let onclick = ctx.link().callback_future_once(move |_e| {
+                    // FIXME: use node refs
                     let login = value_by_id("username").unwrap();
                     let password = value_by_id("pwd").unwrap();
                     async move {
@@ -91,7 +94,13 @@ impl Component for App {
                 let newgame = ctx.link().callback(|_e| AppMsg::CreateNewGame);
                 html! {
                     <>
-                    <h2>{ "Here be your games" }</h2>
+                    <ul>
+                        if self.games.is_empty() {
+                            <h2>{ "No games"}</h2>
+                        } else {
+                            { for self.games.iter() }
+                        }
+                    </ul>
                     <button onclick={newgame}>{ "New game" }</button>
                     </>
                 }

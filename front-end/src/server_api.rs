@@ -13,7 +13,7 @@ use serde_json::json;
 use wasm_bindgen_futures::spawn_local;
 use yew::Callback;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub enum GameSessionStatus {
     Created,
     Player_1_Turn,
@@ -22,16 +22,26 @@ pub enum GameSessionStatus {
     Player_2_Won,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 #[serde(tag = "_type")]
-pub enum RigelMessage {
+pub enum RigelServerMessage {
     #[serde(rename = "status")]
     GameStatusUpdate { newStatus: GameSessionStatus },
 }
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct LoginResponse {
     pub jwt: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct GamesListResponse {
+    pub games: Vec<String>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct NewGameResponse {
+    pub gameId: String,
 }
 
 pub struct ServerApi {
@@ -42,7 +52,7 @@ impl ServerApi {
     pub async fn login(
         username: &str,
         password: &str,
-        onmessage: Callback<Message>,
+        onmessage: Callback<RigelServerMessage>,
     ) -> anyhow::Result<ServerApi> {
         let response = gloo::net::http::Request::post("http://localhost:8080/login")
             .json(&json!({
@@ -68,7 +78,16 @@ impl ServerApi {
         spawn_local(async move {
             while let Some(m) = source.next().await {
                 match m {
-                    Ok(m) => onmessage.emit(m),
+                    Ok(m) => {
+                        if let Message::Text(text_message) = m {
+                            let rigel_message: Result<RigelServerMessage, _> =
+                                serde_json::from_str(&text_message);
+                            match rigel_message {
+                                Ok(m) => onmessage.emit(m),
+                                Err(e) => error!("Cannot parse server message {e:?}"),
+                            }
+                        }
+                    }
                     Err(WebSocketError::ConnectionClose(e)) => info!("Closing ws {e:?}"),
                     Err(e) => panic!("{e:?}"),
                 }
@@ -108,5 +127,4 @@ impl ServerApi {
             ))
             .unwrap()
     }
-    
 }
