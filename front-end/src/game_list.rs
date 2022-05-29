@@ -1,26 +1,27 @@
 use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
-use yew_hooks::use_list;
 
-use crate::app::ApiContext;
+use crate::app::ClientRequest;
+
+#[derive(Properties, PartialEq)]
+pub struct Props {
+    pub client_request: Callback<ClientRequest>,
+}
 
 #[function_component(GameList)]
-pub fn game_list() -> Html {
-    let ctx = use_context::<ApiContext>().unwrap();
-    let api = ctx.api.clone();
-    spawn_local(async move { ctx.api.lock().await.list_games() });
-    let games = ctx.games_list;
+pub fn game_list(props: &Props) -> Html {
+    let games = vec![];
+    let request = props.client_request.clone();
+    let callback = move |_e| request.emit(ClientRequest::CreateGame);
 
     html! {
         <>
-        <button onclick={Callback::once(move |_|spawn_local(async move {
-            api.lock().await.new_game()
-        }))}> { "New game" } </button><br />
-        if games.current().is_empty() {
+        <button onclick={ callback }> { "New game" } </button><br />
+        if games.is_empty() {
             {"No games"}
         } else {
             <ul> {
-                for games.current().iter().map(|g| html!{
+                for games.iter().map(|g: &String| html!{
                     <li> {g} </li>
                 })
             } </ul>

@@ -1,19 +1,22 @@
-use crate::app::Route;
-use wasm_bindgen_futures::spawn_local;
-use yew::prelude::*;
+use crate::app::{App, ClientRequest, Route};
+use yew::{html::Scope, prelude::*};
 use yew_router::prelude::Link;
 
-use crate::{app::ApiContext, utils::value_by_id};
+use crate::utils::value_by_id;
+
+#[derive(Properties, PartialEq)]
+pub struct Props {
+    pub client_request: Callback<ClientRequest>,
+}
 
 #[function_component(Login)]
-pub fn login() -> Html {
-    let ctx = use_context::<ApiContext>().unwrap();
-    let onclick = Callback::once(move |e| {
+pub fn login(props: &Props) -> Html {
+    let callback = props.client_request.clone();
+    let onclick = Callback::once(move |_e| {
         let login = value_by_id("username").unwrap();
         let password = value_by_id("pwd").unwrap();
-        spawn_local(async move {
-            ctx.api.lock().await.login(&login, &password).await.unwrap();
-        })
+
+        callback.emit(ClientRequest::LoginRequest { login, password });
     });
     html! {
         <>

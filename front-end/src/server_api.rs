@@ -38,23 +38,19 @@ pub struct LoginResponse {
     pub jwt: String,
 }
 
+#[derive(Debug)]
 pub struct ServerApi {
+    // Let's keep a copy in case of reconnects
     onmessage: Callback<RigelServerMessage>,
-    sink: Option<Sender<WsMessage>>,
-}
-
-/// The server api is always the same
-/// FIXME: This is needed to use api in props,
-/// maybe better to use an agent and talk to it
-impl PartialEq for ServerApi {
-    fn eq(&self, other: &Self) -> bool {
-        true
-    }
+    sink: Sender<WsMessage>,
 }
 
 impl ServerApi {
-    pub async fn login(&mut self, username: &str, password: &str) -> anyhow::Result<()> {
-        let onmessage = self.onmessage.clone();
+    pub async fn login(
+        username: &str,
+        password: &str,
+        onmessage: Callback<RigelServerMessage>,
+    ) -> anyhow::Result<Self> {
         let response = gloo::net::http::Request::post("http://localhost:8080/login")
             .json(&json!({
                 "name": username,
@@ -76,6 +72,7 @@ impl ServerApi {
         ))
         .await
         .map_err(|e| format_err!("Error sending to ws: {e}"))?;
+        let onmessage_clone = onmessage.clone();
         spawn_local(async move {
             while let Some(m) = source.next().await {
                 match m {
@@ -84,7 +81,7 @@ impl ServerApi {
                             let rigel_message: Result<RigelServerMessage, _> =
                                 serde_json::from_str(&text_message);
                             match rigel_message {
-                                Ok(m) => onmessage.emit(m),
+                                Ok(m) => onmessage_clone.emit(m),
                                 Err(e) => error!("Cannot parse server message {e:?}"),
                             }
                         }
@@ -102,8 +99,10 @@ impl ServerApi {
             }
         });
 
-        self.sink = Some(tx);
-        Ok(())
+        Ok(ServerApi {
+            onmessage,
+            sink: tx,
+        })
     }
 
     pub fn list_games(&mut self) {
@@ -120,16 +119,7 @@ impl ServerApi {
 
     fn send_message(&mut self, message: serde_json::Value) {
         self.sink
-            .as_mut()
-            .unwrap()
             .try_send(WsMessage::Text(message.to_string()))
             .unwrap()
-    }
-
-    pub(crate) fn new(onmessage: Callback<RigelServerMessage>) -> Self {
-        ServerApi {
-            sink: None,
-            onmessage,
-        }
     }
 }

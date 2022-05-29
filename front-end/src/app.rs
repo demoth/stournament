@@ -6,8 +6,8 @@ use crate::{
 use futures::lock::Mutex;
 use log::*;
 use std::rc::Rc;
+use wasm_bindgen_futures::spawn_local;
 use yew::prelude::*;
-use yew_hooks::{use_list, UseListHandle};
 use yew_router::prelude::*;
 
 #[derive(Clone, Routable, PartialEq)]
@@ -23,54 +23,72 @@ pub enum Route {
     NotFound,
 }
 
-#[derive(Clone)]
-pub struct ApiContext {
-    pub api: Rc<Mutex<ServerApi>>,
-    pub games_list: UseListHandle<String>
+#[derive(Debug)]
+pub enum ClientRequest {
+    LoginRequest { login: String, password: String },
+    ListGames,
+    CreateGame,
 }
 
-// The context is singleton so it is equal to itself
-impl PartialEq for ApiContext {
-    fn eq(&self, other: &Self) -> bool {
-        self.games_list == other.games_list
+#[derive(Debug)]
+pub enum GlobalMessage {
+    ClientRequest(ClientRequest),
+    LoggedIn(ServerApi),
+    GetGamesList,
+    ServerMessage(RigelServerMessage),
+}
+
+pub struct App {
+    api: Option<ServerApi>,
+}
+
+impl Component for App {
+    type Message = GlobalMessage;
+    type Properties = ();
+
+    fn create(ctx: &Context<Self>) -> Self {
+        App { api: None }
     }
-}
 
-fn switch(route: &Route) -> Html {
-    match route {
-        Route::Login => html! {<Login />},
-        Route::GamesList | Route::Home => html! { <GameList />},
-        Route::NotFound => html!("Not found"),
+    fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
+        match msg {
+            GlobalMessage::ClientRequest(ClientRequest::LoginRequest { login, password }) => {
+                let onmsg = ctx.link().callback(GlobalMessage::ServerMessage);
+                let onlogin = ctx.link().callback(GlobalMessage::LoggedIn);
+
+                spawn_local(async move {
+                    let api = ServerApi::login(&login, &password, onmsg).await.unwrap();
+                    onlogin.emit(api);
+                })
+            }
+            GlobalMessage::LoggedIn(api) => self.api = Some(api),
+            // FIXME: make serveApi accept ClientRequest instead of separate methods
+            GlobalMessage::ClientRequest(ClientRequest::ListGames) => {
+                self.api.as_mut().unwrap().list_games()
+            }
+            GlobalMessage::ClientRequest(ClientRequest::CreateGame) => {
+                self.api.as_mut().unwrap().new_game()
+            }
+            GlobalMessage::GetGamesList => self.api.as_mut().unwrap().list_games(),
+            GlobalMessage::ServerMessage(sr) => {
+                info!("{sr:?}");
+            }
+        }
+        true
     }
-}
 
-#[function_component(App)]
-pub fn app() -> Html {
-    // FIXME: changing this does not notify the game_list component
-    let games_list = use_list::<String>(vec![]);
+    fn view(&self, ctx: &Context<Self>) -> Html {
+        let client_request = ctx.link().callback(GlobalMessage::ClientRequest);
 
-    let onmessage = {
-        let games_list = games_list.clone();
-        Callback::from(move |m| {
-            info!("Server says {m:?}");
-            match m {
-                RigelServerMessage::GameStatusUpdate { newStatus } => {
-                    info!("New status {newStatus:?}")
-                }
-                RigelServerMessage::GamesListResponse { games } => games_list.set(games),
-                RigelServerMessage::NewGameCreated { gameId } => games_list.push(gameId),
-            };
-        })
-    };
-    let api = ApiContext {
-        api: Rc::new(Mutex::new(ServerApi::new(onmessage))),
-        games_list,
-    };
-    html! {
-        <ContextProvider<ApiContext> context = {api}>
+        let switch = move |route: &Route| match route {
+            Route::Login | Route::Home => html! {<Login client_request = {client_request.clone()}/>},
+            Route::GamesList => html! { <GameList client_request = {client_request.clone()} />},
+            Route::NotFound => html!("Not found"),
+        };
+        html! {
             <BrowserRouter>
                 <Switch<Route> render={Switch::render(switch)} />
             </BrowserRouter>
-        </ContextProvider<ApiContext>>
+        }
     }
 }

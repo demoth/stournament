@@ -18,6 +18,7 @@ web-sys = { version = "0.3.57", features = ["HtmlInputElement"] }
 yew = "0.19.3"
 yew-hooks = "0.1.54"
 yew-router = "0.16.0"
+yewdux = "0.7.0"
 
 [profile.release]
 lto = true
